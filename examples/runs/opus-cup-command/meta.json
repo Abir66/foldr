@@ -1,0 +1,29 @@
+{
+ "slug": "opus-cup-command",
+ "title": "Folds a paper cup, describing each fold",
+ "blurb": "No menu: it describes every fold line itself (for example with an angle bisector).",
+ "model": "Claude Opus",
+ "modelId": "anthropic/claude-opus-5.5",
+ "mode": "command",
+ "plan": false,
+ "goal": {
+  "kind": "example",
+  "text": null,
+  "target": "cup"
+ },
+ "example": "cup",
+ "outcome": {
+  "passed": true,
+  "stopReason": "submitted",
+  "m1": true,
+  "m2": true,
+  "moves": 5,
+  "par": 5,
+  "undos": 1
+ },
+ "costUsd": 0.344764,
+ "turns": 6,
+ "seconds": 97.0,
+ "events": 42,
+ "date": "2026-11-20"
+}

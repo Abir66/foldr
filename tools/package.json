@@ -1,0 +1,11 @@
+{
+  "name": "foldr-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node pyodide_smoke.mjs"
+  },
+  "dependencies": {
+    "pyodide": "0.27.7"
+  }
+}

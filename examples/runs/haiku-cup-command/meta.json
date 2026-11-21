@@ -1,0 +1,29 @@
+{
+ "slug": "haiku-cup-command",
+ "title": "A small model guesses a paper cup",
+ "blurb": "Does not know the fold sequence: it guesses, undoes and submits a wrong shape.",
+ "model": "Claude Haiku",
+ "modelId": "anthropic/claude-haiku-5.5",
+ "mode": "command",
+ "plan": false,
+ "goal": {
+  "kind": "example",
+  "text": null,
+  "target": "cup"
+ },
+ "example": "cup",
+ "outcome": {
+  "passed": false,
+  "stopReason": "submitted",
+  "m1": false,
+  "m2": false,
+  "moves": 2,
+  "par": 5,
+  "undos": 3
+ },
+ "costUsd": 0.020272,
+ "turns": 12,
+ "seconds": 133.5,
+ "events": 72,
+ "date": "2026-11-20"
+}

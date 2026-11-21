@@ -1,0 +1,29 @@
+{
+ "slug": "opus-hat-menu",
+ "title": "Folds a samurai helmet",
+ "blurb": "Knows the plan from the first turn and recognises each fold in the menu.",
+ "model": "Claude Opus",
+ "modelId": "anthropic/claude-opus-5.5",
+ "mode": "menu",
+ "plan": false,
+ "goal": {
+  "kind": "example",
+  "text": null,
+  "target": "hat"
+ },
+ "example": "hat",
+ "outcome": {
+  "passed": true,
+  "stopReason": "submitted",
+  "m1": true,
+  "m2": true,
+  "moves": 10,
+  "par": 9,
+  "undos": 0
+ },
+ "costUsd": 0.556032,
+ "turns": 11,
+ "seconds": 274.5,
+ "events": 81,
+ "date": "2026-11-20"
+}

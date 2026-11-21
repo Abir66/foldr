@@ -1,0 +1,29 @@
+{
+ "slug": "sonnet-hat-menu",
+ "title": "Tries a samurai helmet",
+ "blurb": "Follows a written plan, keeps undoing a correct base and ends with wrong folds.",
+ "model": "Claude Sonnet",
+ "modelId": "anthropic/claude-sonnet-5.5",
+ "mode": "menu",
+ "plan": true,
+ "goal": {
+  "kind": "example",
+  "text": null,
+  "target": "hat"
+ },
+ "example": "hat",
+ "outcome": {
+  "passed": false,
+  "stopReason": "submitted",
+  "m1": false,
+  "m2": false,
+  "moves": 8,
+  "par": 9,
+  "undos": 5
+ },
+ "costUsd": 0.690136,
+ "turns": 26,
+ "seconds": 29.2,
+ "events": 193,
+ "date": "2026-11-21"
+}

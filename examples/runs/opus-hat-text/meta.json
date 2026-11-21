@@ -1,0 +1,29 @@
+{
+ "slug": "opus-hat-text",
+ "title": "Folds a samurai helmet from words only",
+ "blurb": "No picture of the result: only one sentence. It writes its own plan, then picks folds from the menu.",
+ "model": "Claude Opus",
+ "modelId": "anthropic/claude-opus-5.5",
+ "mode": "menu",
+ "plan": false,
+ "goal": {
+  "kind": "text",
+  "text": "Fold a samurai helmet (kabuto) from one square sheet of paper (coloured on one side). It should be something you could wear: two horns sticking out at the top, a brim across the front, and an opening at the bottom for the head.",
+  "target": "hat"
+ },
+ "example": "hat_behind",
+ "outcome": {
+  "passed": true,
+  "stopReason": "submitted",
+  "m1": true,
+  "m2": false,
+  "moves": 10,
+  "par": 9,
+  "undos": 1
+ },
+ "costUsd": 0.954252,
+ "turns": 18,
+ "seconds": 26.4,
+ "events": 143,
+ "date": "2026-11-21"
+}

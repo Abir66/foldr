@@ -1,0 +1,29 @@
+{
+ "slug": "opus-cup-menu",
+ "title": "Folds a paper cup",
+ "blurb": "Five folds from the menu, no undo.",
+ "model": "Claude Opus",
+ "modelId": "anthropic/claude-opus-5.5",
+ "mode": "menu",
+ "plan": false,
+ "goal": {
+  "kind": "example",
+  "text": null,
+  "target": "cup"
+ },
+ "example": "cup",
+ "outcome": {
+  "passed": true,
+  "stopReason": "submitted",
+  "m1": true,
+  "m2": true,
+  "moves": 5,
+  "par": 5,
+  "undos": 0
+ },
+ "costUsd": 0.524896,
+ "turns": 10,
+ "seconds": 75.0,
+ "events": 70,
+ "date": "2026-11-20"
+}
