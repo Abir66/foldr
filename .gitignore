@@ -1,0 +1,26 @@
+.env
+.env.*
+!.env.example
+runs/
+!examples/runs/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+papers/
+out/
+.pytest_cache/
+.DS_Store
+.claude/worktrees/
+backend/foldr.toml
+
+# planning notes / logs stay local, never in git
+docs/design.md
+docs/wip/
+
+# built by tools/build_examples.py
+frontend/public/examples/
+# built by frontend/scripts/build-wheel.mjs
+frontend/public/py/
+*.tsbuildinfo
