@@ -5,7 +5,8 @@ import { useUi } from "../../lib/store";
 import type { Lin2 } from "../../lib/stateSvg";
 import type { Timeline } from "../../lib/timeline";
 import { getViewer } from "../../viewer/Viewer";
-import type { ApplyResult, CustomParams, ExportKind, MenuOption, PointJson, PreviewResult, Step } from "../../worker/protocol";
+import { refName, samePoint, type PointRef } from "./snap";
+import type { ApplyResult, CustomParams, ExportKind, MenuOption, ModelJson, PointJson, PreviewResult, Step } from "../../worker/protocol";
 import { call, ensurePython, saveFile } from "../../worker/rpc";
 
 export const SECTION_ORDER = ["repeat", "onto", "through", "edges", "align", "flap", "tuck", "special", "unfold"];
@@ -40,8 +41,8 @@ export interface MyStep {
 }
 
 export interface Draw {
-  p: string | null;
-  q: string | null;
+  p: PointRef | null;
+  q: PointRef | null;
   kind: "through" | "onto";
   op: "valley" | "mountain";
   side: 1 | -1;
@@ -72,6 +73,10 @@ interface FoldState {
   lin: Lin2 | null;
 
   start(coloredSide: "up" | "down"): Promise<void>;
+  /** new session holding the first k steps of a model; `built` = a timeline already built for those steps */
+  startFrom(model: ModelJson, k: number, built?: Timeline | null): Promise<boolean>;
+  /** drop the steps after step k */
+  undoTo(k: number): Promise<void>;
   startOver(): void;
   loadMenu(): Promise<void>;
   showMore(section: string): Promise<void>;
@@ -80,7 +85,9 @@ interface FoldState {
   applySelected(): Promise<void>;
   undo(): Promise<void>;
   setDrawing(on: boolean): void;
-  tapPoint(label: string): void;
+  tapPoint(ref: PointRef): void;
+  /** fold p onto q (drag from p, release at q) and preview it */
+  dragOnto(p: PointRef, q: PointRef): void;
   setDraw(patch: Partial<Draw>): void;
   setView3d(on: boolean): void;
   exportFiles(kinds: ExportKind[]): Promise<void>;
@@ -157,6 +164,7 @@ export const useFold = create<FoldState>((set, get) => {
         await ensurePython("core");
         const r = await call("session.new", { size: 1, colored_side: coloredSide });
         useUi.getState().setStep(0);
+        useUi.getState().setView("flat");
         set({
           phase: "folding",
           rev: r.rev,
@@ -174,6 +182,48 @@ export const useFold = create<FoldState>((set, get) => {
         void get().loadMenu();
       } catch (e) {
         set({ phase: "error", message: { kind: "error", text: (e as Error).message } });
+      }
+    },
+
+    async startFrom(model, k, built) {
+      const coloredSide = model.paper?.colored_side ?? "up";
+      set({ phase: "loading", coloredSide, message: null, busy: "Getting the paper ready…" });
+      try {
+        await ensurePython("core");
+        const seed =
+          built && built.steps.length >= k && built.states.length > k && built.states.slice(0, k + 1).every((s) => "world" in s)
+            ? { states: built.states.slice(0, k + 1), steps: built.steps.slice(0, k) }
+            : undefined;
+        if (!seed) set({ busy: `Folding ${k} step${k === 1 ? "" : "s"}…` });
+        const r = await call("session.load", { model, k, timeline: seed });
+        const tl: Timeline = r.timeline ?? { ...built!, name: "my_fold", title: "My fold", states: seed!.states, steps: seed!.steps };
+        const steps: MyStep[] = tl.steps.map((ts, i) => {
+          const d = model.steps[i]?.description;
+          return { op: ts.op, text: typeof d === "string" ? d : ts.description };
+        });
+        useUi.getState().setPlaying(false);
+        useUi.getState().setStep(steps.length);
+        set({
+          phase: "folding",
+          rev: r.rev,
+          timeline: tl,
+          points: r.points,
+          steps,
+          sections: [],
+          selected: null,
+          preview: null,
+          drawing: false,
+          draw: DRAW0,
+          view3d: false,
+          busy: null,
+        });
+        useUi.getState().setView("flat");
+        syncLin();
+        void get().loadMenu();
+        return true;
+      } catch (e) {
+        set({ phase: "start", timeline: null, steps: [], busy: null, message: { kind: "error", text: (e as Error).message } });
+        return false;
       }
     },
 
@@ -271,17 +321,23 @@ export const useFold = create<FoldState>((set, get) => {
       }
       if (s.selected?.kind === "custom" && s.preview?.step) {
         const d = s.draw;
-        const what = d.kind === "through" ? `through ${d.p} and ${d.q}` : d.side === 1 ? `${d.p} onto ${d.q}` : `${d.q} onto ${d.p}`;
+        const [p, q] = [refName(d.p!), refName(d.q!)];
+        const what = d.kind === "through" ? `through ${p} and ${q}` : d.side === 1 ? `${p} onto ${q}` : `${q} onto ${p}`;
         await get().apply(s.preview.step, `${d.op === "valley" ? "Valley" : "Mountain"} fold ${what}`);
       }
     },
 
     async undo() {
       const tl = get().timeline;
-      if (!tl || !tl.steps.length) return;
+      if (tl?.steps.length) await get().undoTo(tl.steps.length - 1);
+    },
+
+    async undoTo(k) {
+      const tl = get().timeline;
+      if (!tl || k >= tl.steps.length || k < 0) return;
       set({ busy: "Undoing…", message: null });
       try {
-        const r = await call("session.undo", { n: 1 });
+        const r = await call("session.undo", { n: tl.steps.length - k });
         if (!r.ok) {
           set({ message: { kind: "error", text: r.text } });
           return;
@@ -310,16 +366,22 @@ export const useFold = create<FoldState>((set, get) => {
       set((s) => ({ drawing: on, draw: { ...s.draw, p: null, q: null, side: 1 }, selected: on ? null : s.selected, preview: on ? null : s.preview }));
     },
 
-    tapPoint(label) {
+    tapPoint(ref) {
       const s = get();
       if (!s.drawing) set({ drawing: true, selected: null, preview: null });
       const d = get().draw;
-      if (!d.p || (d.p && d.q)) set({ draw: { ...d, p: label, q: null, side: 1 }, selected: null, preview: null });
-      else if (label === d.p) set({ draw: { ...d, p: null } });
+      if (!d.p || (d.p && d.q)) set({ draw: { ...d, p: ref, q: null, side: 1 }, selected: null, preview: null });
+      else if (samePoint(ref, d.p)) set({ draw: { ...d, p: null } });
       else {
-        set({ draw: { ...d, q: label } });
+        set({ draw: { ...d, q: ref } });
         void previewCustom();
       }
+    },
+
+    dragOnto(p, q) {
+      if (samePoint(p, q)) return;
+      set((s) => ({ drawing: true, selected: null, preview: null, draw: { ...s.draw, p, q, kind: "onto", side: 1 } }));
+      void previewCustom();
     },
 
     setDraw(patch) {

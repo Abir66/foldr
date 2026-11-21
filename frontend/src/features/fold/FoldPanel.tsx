@@ -1,25 +1,76 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import type { Source } from "../../app/source";
+import { hrefFor } from "../../lib/router";
 import { useUi } from "../../lib/store";
-import { showInWatch } from "../../lib/openLocal";
-import { OpBadge, StepNum } from "../../ui/Notation";
-import type { ModelJson, MenuOption } from "../../worker/protocol";
+import type { MenuOption } from "../../worker/protocol";
 import { ensurePython, usePython } from "../../worker/rpc";
+import { foldFromHere } from "./foldFromHere";
 import { SECTION_TITLES, useFold, type Section } from "./foldStore";
 import { StateThumb } from "./StateThumb";
+import { NowStep, StepList } from "./TimelineSteps";
 import "./fold.css";
 
-export function FoldPanel() {
+/** Fold mode side panel: the steps of what is on the canvas, or your own folding tools. */
+export function FoldPanel({ source }: { source: Source }) {
   const phase = useFold((s) => s.phase);
 
-  // entering Fold starts the download while the user picks a side
+  // entering your own folding starts the download while the user picks a side
   useEffect(() => {
-    ensurePython("core").catch(() => {});
-  }, []);
+    if (source.kind === "own") ensurePython("core").catch(() => {});
+  }, [source.kind]);
 
+  if (source.kind !== "own") return <Watching source={source} />;
   return (
     <div className="fold">
       <h1 className="model-title">Fold it yourself</h1>
-      {phase === "folding" ? <Folding /> : <StartSheet />}
+      <p className="fold-sample">
+        <button className="text-link" onClick={() => useUi.getState().setLibraryOpen(true)}>
+          Load a sample
+        </button>
+      </p>
+      {phase === "folding" ? <Folding source={source} /> : <StartSheet />}
+    </div>
+  );
+}
+
+function FromHereButton({ source, primary = false }: { source: Source; primary?: boolean }) {
+  const step = useUi((s) => s.step);
+  const busy = useFold((s) => !!s.busy || s.phase === "loading");
+  const [working, setWorking] = useState(false);
+  return (
+    <button
+      className={`button ${primary ? "button-primary" : "button-quiet"}`}
+      disabled={busy || working}
+      title={`Start folding from the paper at step ${step}`}
+      onClick={async () => {
+        setWorking(true);
+        try {
+          await foldFromHere(source, step);
+        } finally {
+          setWorking(false);
+        }
+      }}
+    >
+      Fold yourself from step {step}
+    </button>
+  );
+}
+
+function Watching({ source }: { source: Source }) {
+  return (
+    <div className="watch">
+      <div className="watch-top">
+        <h1 className="model-title">{source.label}</h1>
+        <p className="model-meta">{source.n} steps from one square</p>
+        <div className="watch-actions">
+          <FromHereButton source={source} primary />
+          <a className="button button-quiet" href={hrefFor("fold")}>
+            Start from scratch
+          </a>
+        </div>
+        <NowStep source={source} />
+      </div>
+      <StepList steps={source.steps} />
     </div>
   );
 }
@@ -48,7 +99,7 @@ function LoadBar() {
 function StartSheet() {
   const side = useUi((s) => s.foldSide);
   const setSide = useUi((s) => s.setFoldSide);
-  const { phase, message, start } = useFold();
+  const { phase, message, start, busy } = useFold();
   const core = usePython((s) => s.core);
   const starting = phase === "loading";
   return (
@@ -61,24 +112,34 @@ function StartSheet() {
           <span>White side up</span>
         </label>
         <label className="choice-opt">
-          <input type="radio" name="side" checked={side === "blue"} onChange={() => setSide("blue")} />
-          <span>Blue side up</span>
+          <input type="radio" name="side" checked={side === "colored"} onChange={() => setSide("colored")} />
+          <span>Coloured side up</span>
         </label>
       </fieldset>
-      <button className="button button-primary fold-start" disabled={starting || core === "error"} onClick={() => start(side === "blue" ? "up" : "down")}>
+      <button className="button button-primary fold-start" disabled={starting || core === "error"} onClick={() => start(side === "colored" ? "up" : "down")}>
         {starting ? "Getting ready…" : "Start folding"}
       </button>
+      {starting && busy && <p className="fold-msg" role="status">{busy}</p>}
       <LoadBar />
       {message && <p className="fold-msg is-error" role="alert">{message.text}</p>}
     </>
   );
 }
 
-function Folding() {
+function Folding({ source }: { source: Source }) {
   const { steps, busy, message, selected, drawing } = useFold();
+  const step = useUi((s) => s.step);
   return (
     <>
       <Toolbar />
+      {step < steps.length && (
+        <div className="fold-behind" role="status">
+          <p className="hint">
+            You are looking at step {step}. New folds go after step {steps.length}.
+          </p>
+          <FromHereButton source={source} />
+        </div>
+      )}
       {busy && <p className="fold-msg" role="status">{busy}</p>}
       {message && (
         <p className={`fold-msg ${message.kind === "error" ? "is-error" : ""}`} role="alert">
@@ -86,33 +147,28 @@ function Folding() {
         </p>
       )}
       {(selected || drawing) && <ActionBar />}
-      {steps.length > 0 && <MySteps />}
+      {steps.length > 0 && (
+        <section className="mysteps">
+          <h2 className="section-title">Your steps</h2>
+          <StepList steps={source.steps} label="Your steps" />
+        </section>
+      )}
       <Suggestions />
     </>
   );
 }
 
 function Toolbar() {
-  const { steps, busy, view3d, apply, undo, startOver, setView3d, setDrawing, drawing } = useFold();
+  const { steps, busy, undo, startOver, setDrawing, drawing } = useFold();
   const disabled = !!busy;
   return (
     <div className="toolbar fold-toolbar" role="toolbar" aria-label="Folding tools">
-      <button className="button button-quiet" disabled={disabled || !steps.length} onClick={undo}>
-        Undo
-      </button>
-      <button className="button button-quiet" disabled={disabled} onClick={() => apply({ op: "flip" })}>
-        Turn over
-      </button>
-      <button className="button button-quiet" disabled={disabled} onClick={() => apply({ op: "rotate", degrees: 45 })}>
-        Rotate 45°
-      </button>
       <button className={`button ${drawing ? "button-primary" : "button-quiet"}`} aria-pressed={drawing} disabled={disabled} onClick={() => setDrawing(!drawing)}>
         Draw a fold
       </button>
-      <button className="button button-quiet" aria-pressed={view3d} onClick={() => setView3d(!view3d)}>
-        {view3d ? "Flat view" : "3D view"}
+      <button className="button button-quiet" disabled={disabled || !steps.length} onClick={undo}>
+        Undo
       </button>
-      <ExportFolds />
       <button
         className="button button-quiet"
         disabled={disabled}
@@ -122,52 +178,6 @@ function Toolbar() {
       >
         Start over
       </button>
-    </div>
-  );
-}
-
-function ExportFolds() {
-  const [open, setOpen] = useState(false);
-  const { steps, busy, exportFiles, myModel, timeline } = useFold();
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, [open]);
-  const none = !steps.length;
-  const run = (f: () => unknown) => () => {
-    setOpen(false);
-    void f();
-  };
-  return (
-    <div className="export fold-export" ref={ref}>
-      <button className="button button-quiet" aria-expanded={open} aria-haspopup="menu" disabled={none || !!busy} onClick={() => setOpen(!open)}>
-        Export
-      </button>
-      {open && (
-        <div className="export-menu" role="menu">
-          <button role="menuitem" className="export-item" onClick={run(async () => {
-            const model = (await myModel()) as ModelJson;
-            if (timeline) showInWatch(model, timeline, "My fold");
-          })}>
-            Watch my folds
-          </button>
-          <button role="menuitem" className="export-item" onClick={run(() => exportFiles(["model_json"]))}>
-            Steps (.json)
-          </button>
-          <button role="menuitem" className="export-item" onClick={run(() => exportFiles(["fold"]))}>
-            Crease pattern (.fold)
-          </button>
-          <button role="menuitem" className="export-item" onClick={run(() => exportFiles(["png_zip"]))}>
-            Step pictures (.zip)
-            <span className="export-soon">loads 4 MB more</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -184,7 +194,7 @@ function ActionBar() {
           : "Fold P onto Q"
         : draw.p
           ? "Now tap point Q"
-          : "Tap point P on the paper";
+          : "Tap point P anywhere on the paper, or drag it onto Q";
   return (
     <section className="actionbar" aria-label="Chosen fold">
       <p className="actionbar-title">{title}</p>
@@ -248,24 +258,6 @@ function Seg({ label, value, options, onChange }: { label: string; value: string
         </button>
       ))}
     </div>
-  );
-}
-
-function MySteps() {
-  const steps = useFold((s) => s.steps);
-  return (
-    <section className="mysteps">
-      <h2 className="section-title">Your steps</h2>
-      <ol className="steps fold-steps">
-        {steps.map((s, i) => (
-          <li key={i} className="step-row is-static">
-            <StepNum n={i + 1} current={i === steps.length - 1} />
-            <OpBadge op={s.op} />
-            <span className="step-text">{s.text}</span>
-          </li>
-        ))}
-      </ol>
-    </section>
   );
 }
 

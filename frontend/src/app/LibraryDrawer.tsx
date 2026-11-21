@@ -5,6 +5,7 @@ import { useUi } from "../lib/store";
 import { Thumb } from "../ui/Thumb";
 import { RunMark } from "../features/ai/RunMark";
 import { openFile } from "../lib/openLocal";
+import { GITHUB_URL, GitHubMark } from "../ui/GitHubMark";
 
 export function LibraryDrawer({ route }: { route: Route }) {
   const open = useUi((s) => s.libraryOpen);
@@ -63,10 +64,10 @@ export function LibraryDrawer({ route }: { route: Route }) {
         <h3 className="drawer-section">Examples</h3>
         <ul className="lib-list">
           {EXAMPLES.map((e) => {
-            const current = route.mode === "watch" && route.example === e.name;
+            const current = route.mode === "fold" && !route.own && route.example === e.name;
             return (
               <li key={e.name}>
-                <a className="lib-row" href={hrefFor("watch", e.name)} onClick={close} aria-current={current ? "true" : undefined}>
+                <a className="lib-row" href={hrefFor("fold", e.name)} onClick={close} aria-current={current ? "true" : undefined}>
                   <Thumb name={e.name} size={48} className="lib-thumb" />
                   <span className="lib-text">
                     <span className="lib-name">{e.label}</span>
@@ -118,6 +119,10 @@ export function LibraryDrawer({ route }: { route: Route }) {
         >
           About Foldr and keyboard keys
         </button>
+        <a className="github-link drawer-github" href={GITHUB_URL} target="_blank" rel="noopener">
+          <GitHubMark />
+          <span>GitHub</span>
+        </a>
       </div>
     </dialog>
   );

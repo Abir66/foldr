@@ -35,6 +35,8 @@ export interface Turn {
 export interface Committed {
   step: StepJson;
   state: StateJson;
+  /** the model step the agent applied (as in a model JSON file) */
+  src?: Record<string, unknown> & { op: string };
 }
 
 export interface RunView {
@@ -114,7 +116,7 @@ export function reduce(prev: RunView, e: RunEvent): RunView {
     }
     case "action": {
       const commit = e.ok && e.timeline_step && e.state;
-      if (commit) v.steps = [...v.steps, { step: e.timeline_step, state: e.state }];
+      if (commit) v.steps = [...v.steps, { step: e.timeline_step, state: e.state, src: e.step ?? undefined }];
       touch(e.turn, (t) => ({ actions: [...t.actions, e], ...(commit ? { made: v.steps.length } : {}) }));
       break;
     }

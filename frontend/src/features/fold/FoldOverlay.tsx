@@ -1,15 +1,33 @@
 // Drawn over the top-down paper in Fold mode: tappable point stickers, the chosen points,
 // and the preview (fold line + a ghost of the result). Engine coords map to the screen via the viewer.
-import { useEffect, useReducer, useRef } from "react";
+// Taps snap to a labeled point, then a paper edge, then anywhere on the paper; dragging from a point
+// shows the live "fold P onto Q" crease and previews it on release.
+import { useEffect, useReducer, useRef, useState } from "react";
 import type { Vec2 } from "../../lib/timeline";
 import { getViewer } from "../../viewer/Viewer";
 import { useFold } from "./foldStore";
+import { bisectorSegment, facePolys, samePoint, snapAt, type Snap } from "./snap";
 
 const SNAP_PX = 28;
+const EDGE_PX = 14;
+const TOUCH_SNAP_PX = 40;
+const TOUCH_EDGE_PX = 26;
+const DRAG_PX = 10;
+
+interface Drag {
+  start: Snap;
+  at: Vec2;
+  cur: Snap | null;
+  moved: boolean;
+}
 
 export function FoldOverlay() {
   const { points, drawing, draw, preview, selected, phase, view3d, coloredSide, busy } = useFold();
   const tapPoint = useFold((s) => s.tapPoint);
+  const dragOnto = useFold((s) => s.dragOnto);
+  const timeline = useFold((s) => s.timeline);
+  const [hover, setHover] = useState<Snap | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
   const [, redraw] = useReducer((x: number) => x + 1, 0);
   const svgRef = useRef<SVGSVGElement>(null);
   const hidden = useRef(true);
@@ -39,29 +57,55 @@ export function FoldOverlay() {
   if (phase !== "folding" || view3d || !v || hidden.current) return null;
   const S = (p: Vec2) => v.toScreen(p) ?? ([0, 0] as Vec2);
 
-  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (busy) return;
+  const polys = facePolys(timeline?.states[timeline.states.length - 1]);
+  const local = (e: React.PointerEvent<SVGSVGElement>): Vec2 => {
     const r = svgRef.current!.getBoundingClientRect();
-    const x = e.clientX - r.left,
-      y = e.clientY - r.top;
-    let best: string | null = null,
-      bd = SNAP_PX;
-    for (const p of visible) {
-      const [px, py] = S(p.xy);
-      const d = Math.hypot(px - x, py - y);
-      if (d < bd) {
-        bd = d;
-        best = p.label;
-      }
-    }
-    if (best) {
-      e.preventDefault();
-      tapPoint(best);
-    }
+    return [e.clientX - r.left, e.clientY - r.top];
+  };
+  const snap = (e: React.PointerEvent<SVGSVGElement>, at: Vec2) => {
+    const r = svgRef.current!.getBoundingClientRect();
+    const touch = e.pointerType === "touch";
+    return snapAt(at, {
+      labels: visible,
+      polys,
+      toScreen: S,
+      fromScreen: (s) => v.pickPoint(s[0] + r.left, s[1] + r.top),
+      pointPx: touch ? TOUCH_SNAP_PX : SNAP_PX,
+      edgePx: touch ? TOUCH_EDGE_PX : EDGE_PX,
+    });
   };
 
-  const ghost = preview?.ok && preview.state;
-  const line = preview?.line;
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (busy || !e.isPrimary) return;
+    const at = local(e);
+    const start = snap(e, at);
+    if (!start) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setHover(null);
+    setDrag({ start, at, cur: null, moved: false });
+  };
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!e.isPrimary) return;
+    const at = local(e);
+    if (drag) {
+      const moved = drag.moved || Math.hypot(at[0] - drag.at[0], at[1] - drag.at[1]) > DRAG_PX;
+      setDrag({ ...drag, moved, cur: moved ? snap(e, at) : null });
+    } else if (e.pointerType !== "touch" && !busy) {
+      setHover(snap(e, at));
+    }
+  };
+  const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!drag || !e.isPrimary) return;
+    setDrag(null);
+    if (!drag.moved) tapPoint(drag.start.ref);
+    else if (drag.cur && !samePoint(drag.cur.ref, drag.start.ref)) dragOnto(drag.start.ref, drag.cur.ref);
+  };
+
+  const dragging = drag?.moved ? drag : null;
+  const liveLine = dragging?.cur ? bisectorSegment(dragging.start.xy, dragging.cur.xy, polys) : null;
+  const ghost = !dragging && preview?.ok && preview.state;
+  const line = dragging ? liveLine : preview?.line;
   const selOp = preview?.step?.op ?? (selected?.kind === "menu" ? selected.option.step.op : draw.op);
   const showLetters = drawing;
   const kami = coloredSide === "up";
@@ -73,11 +117,20 @@ export function FoldOverlay() {
       p.stacked.forEach((l) => seen.add(l));
       return true;
     })
-    .map((p) => (draw.p && p.stacked.includes(draw.p) ? { ...p, label: draw.p } : draw.q && p.stacked.includes(draw.q) ? { ...p, label: draw.q } : p))
+    .map((p) => (typeof draw.p === "string" && p.stacked.includes(draw.p) ? { ...p, label: draw.p } : typeof draw.q === "string" && p.stacked.includes(draw.q) ? { ...p, label: draw.q } : p))
     .sort((a, b) => Number(a.label === draw.p || a.label === draw.q) - Number(b.label === draw.p || b.label === draw.q));
 
   return (
-    <svg ref={svgRef} className="fold-overlay" onPointerDown={onPointerDown} aria-hidden="true">
+    <svg
+      ref={svgRef}
+      className="fold-overlay"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => setDrag(null)}
+      onPointerLeave={() => setHover(null)}
+      aria-hidden="true"
+    >
       {ghost &&
         [...ghost.faces]
           .sort((a, b) => a.layer - b.layer)
@@ -88,7 +141,11 @@ export function FoldOverlay() {
           })}
       {line && (() => {
         const [a, b] = [S(line[0]), S(line[1])];
-        return <line className={selOp === "mountain" ? "fold-line is-mountain" : "fold-line"} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
+        return <line className={!dragging && selOp === "mountain" ? "fold-line is-mountain" : "fold-line"} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
+      })()}
+      {dragging?.cur && (() => {
+        const [a, b] = [S(dragging.start.xy), S(dragging.cur.xy)];
+        return <line className="drag-arrow" x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
       })()}
       {preview?.move && (() => {
         const [x, y] = S(preview.move);
@@ -104,6 +161,28 @@ export function FoldOverlay() {
           </g>
         );
       })}
+      {(dragging ? [dragging.start.ref, dragging.cur?.ref ?? null] : [draw.p, draw.q]).map((r, i) =>
+        r !== null && typeof r !== "string" ? <Chosen key={i} at={S(r)} letter={i ? "Q" : "P"} /> : null,
+      )}
+      {dragging?.cur && <SnapMarker snap={dragging.cur} at={S(dragging.cur.xy)} />}
+      {!drag && hover && <SnapMarker snap={hover} at={S(hover.xy)} />}
     </svg>
   );
 }
+
+function Chosen({ at, letter }: { at: Vec2; letter: string }) {
+  return (
+    <g className="pt-sticker is-chosen is-free" transform={`translate(${at[0]},${at[1]})`}>
+      <circle r={11} />
+      <text dy="0.35em">{letter}</text>
+    </g>
+  );
+}
+
+function SnapMarker({ snap, at }: { snap: Snap; at: Vec2 }) {
+  const t = `translate(${at[0]},${at[1]})`;
+  if (snap.kind === "point") return <circle className="snap-marker is-point" transform={t} r={16} />;
+  if (snap.kind === "edge") return <rect className="snap-marker is-edge" transform={`${t} rotate(45)`} x={-6} y={-6} width={12} height={12} />;
+  return <path className="snap-marker is-free" transform={t} d="M-7 0H7M0 -7V7" />;
+}
+

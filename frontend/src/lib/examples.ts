@@ -52,7 +52,7 @@ export function getExample(name: string | undefined): Example | undefined {
   return EXAMPLES.find((e) => e.name === name) ?? LOCAL_EXAMPLES.find((e) => e.name === name);
 }
 
-/** Models opened in this tab (your own folds, uploaded files): playable in Watch, not in the library list. */
+/** Models opened in this tab (your own folds, uploaded files): playable in Fold, not in the library list. */
 export const LOCAL_EXAMPLES: Example[] = [];
 
 export function addLocalExample(e: Example): void {

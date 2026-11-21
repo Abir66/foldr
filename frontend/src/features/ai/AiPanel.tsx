@@ -187,7 +187,7 @@ export function AiPanel({ runSlug }: { runSlug?: string }) {
       {cfg === null && (
         <>
           <p className="lead">
-            <strong>AI is off in this demo</strong>, so nobody's money gets spent. Watch a recorded run below, or run Foldr on your own
+            <strong>AI is off in this demo</strong>, because I am too broke to afford API calls :') Watch a recorded run below, or run Foldr on your own
             computer with your own key:
           </p>
           <pre className="commands" tabIndex={0} aria-label="Commands to run Foldr on your computer">

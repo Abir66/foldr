@@ -105,6 +105,10 @@ export interface Api {
     { timeline: Timeline | null; error: string | null; failed_step: number | null; shown_steps: number },
   ];
   "session.new": [{ size?: number; colored_side?: "up" | "down" }, { rev: number; state: StateJson; timeline: Timeline; points: PointJson[] }];
+  "session.load": [
+    { model: ModelJson; k?: number; timeline?: { states: StateJson[]; steps: StepJson[] } },
+    { rev: number; state: StateJson; points: PointJson[]; timeline_len: number; timeline: Timeline | null },
+  ];
   "session.apply": [{ step: Step }, ApplyResult];
   "session.preview": [{ step: Step }, PreviewResult];
   "session.undo": [{ n?: number }, { rev: number; ok: boolean; text: string; timeline_len: number; state: StateJson; points: PointJson[] }];

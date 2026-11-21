@@ -2,6 +2,8 @@ import { create } from "zustand";
 
 export type SheetSnap = "peek" | "half" | "full";
 export type Speed = 0.5 | 1 | 2;
+/** 3D orbit, flat top-down, front and back side by side, unfolded crease pattern */
+export type CanvasView = "3d" | "flat" | "sides" | "cp";
 
 interface UiState {
   /** current step, 0 = flat sheet, n = finished */
@@ -16,8 +18,10 @@ interface UiState {
   libraryOpen: boolean;
   aboutOpen: boolean;
   /** Fold mode: which side of the paper faces up at the start */
-  foldSide: "white" | "blue";
-  setFoldSide: (s: "white" | "blue") => void;
+  foldSide: "white" | "colored";
+  setFoldSide: (s: "white" | "colored") => void;
+  view: CanvasView;
+  setView: (v: CanvasView) => void;
   setStep: (k: number) => void;
   setPlaying: (p: boolean) => void;
   setSpeed: (s: Speed) => void;
@@ -37,6 +41,8 @@ export const useUi = create<UiState>((set) => ({
   aboutOpen: false,
   foldSide: "white",
   setFoldSide: (foldSide) => set({ foldSide }),
+  view: "3d",
+  setView: (view) => set({ view }),
   setStep: (step) => set({ step, pos: step, foldK: Math.max(0, step - 1) }),
   setPlaying: (playing) => set({ playing }),
   setSpeed: (speed) => set({ speed }),

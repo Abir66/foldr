@@ -1,13 +1,16 @@
-// Tiny hash router. Routes: #/watch/<example>, #/fold, #/ai, #/ai/<run-slug>.
+// Tiny hash router. Routes: #/fold/<example> (watch and fold an example), #/fold (your own folding),
+// #/ai, #/ai/<run-slug>. Old #/watch/<example> links open the example in Fold.
 // Viewer URL params (?step=k, ?pose=k,t, ?orbit=a,b) may sit in the hash query or the real query.
 import { useEffect, useState } from "react";
 import { DEFAULT_EXAMPLE, getExample } from "./examples";
 
-export type Mode = "watch" | "fold" | "ai";
+export type Mode = "fold" | "ai";
 
 export interface Route {
   mode: Mode;
-  example: string; // watch: which example
+  example: string; // fold: which example is shown (when not own)
+  /** fold: your own folding session instead of an example */
+  own: boolean;
   run?: string; // ai: which recorded run
   params: URLSearchParams;
 }
@@ -20,16 +23,16 @@ export function parseHash(hash: string, search = ""): Route {
   new URLSearchParams(query).forEach((v, k) => params.set(k, v));
 
   const head = parts[0];
-  if (head === "fold") return { mode: "fold", example: DEFAULT_EXAMPLE, params };
-  if (head === "ai") return { mode: "ai", example: DEFAULT_EXAMPLE, run: parts[1], params };
+  if (head === "ai") return { mode: "ai", example: DEFAULT_EXAMPLE, own: false, run: parts[1], params };
+  if (head === "fold" && !parts[1]) return { mode: "fold", example: DEFAULT_EXAMPLE, own: true, params };
   const example = getExample(parts[1]) ? parts[1] : DEFAULT_EXAMPLE;
-  return { mode: "watch", example, params };
+  return { mode: "fold", example, own: false, params };
 }
 
+/** #/fold/<example>, or #/fold (own folding) without an id; #/ai[/<run>]. */
 export function hrefFor(mode: Mode, id?: string): string {
-  if (mode === "watch") return `#/watch/${id ?? DEFAULT_EXAMPLE}`;
   if (mode === "ai") return id ? `#/ai/${id}` : "#/ai";
-  return "#/fold";
+  return id ? `#/fold/${id}` : "#/fold";
 }
 
 /** Reads ?step=k (1-based, like the old viewer) and clamps it to [1, n]. */

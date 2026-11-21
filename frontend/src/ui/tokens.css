@@ -9,9 +9,14 @@
   --ink-soft: #545e68;
   --kami: #2f5da8;
   --kami-deep: #234a8a;
-  --accent: #ec7a2f; /* crease orange: fold lines, current step */
-  --accent-deep: #b9551a;
-  --accent-soft: #fdf0e6;
+  --accent: #2f5da8; /* current step, progress */
+  --accent-deep: #234a8a;
+  --accent-soft: #eaf0f9;
+  --paper: #e07a3f; /* coloured side of the paper */
+  --paper-back: #fbf6ec;
+  --paper-edge: #3a2a1a;
+  --crease: #5c3d24;
+  --mountain: #b3261e;
   --sticker: #f2c230; /* Fold-mode point markers */
   --warn: #c2412d;
 

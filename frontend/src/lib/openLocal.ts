@@ -1,4 +1,4 @@
-// Open a model that has no prebuilt files (your own fold, an uploaded model or AI solution) in Watch.
+// Open a model that has no prebuilt files (an uploaded model or AI solution) on the Fold canvas.
 // Timelines for uploads are built by Python in the worker.
 import { call, ensurePython } from "../worker/rpc";
 import type { ModelJson } from "../worker/protocol";
@@ -13,8 +13,8 @@ export interface OpenResult {
   note?: string;
 }
 
-/** Register the model + timeline as a local example and switch to Watch on it. */
-export function showInWatch(model: ModelJson, timeline: Timeline, label: string): string {
+/** Register the model + timeline as a local example and show it in Fold. */
+export function showInFold(model: ModelJson, timeline: Timeline, label: string): string {
   const name = `local-${++counter}`;
   addLocalExample({
     name,
@@ -26,11 +26,11 @@ export function showInWatch(model: ModelJson, timeline: Timeline, label: string)
     local: { model },
   });
   putTimeline(name, { ...timeline, states: [...timeline.states], steps: [...timeline.steps] });
-  window.location.hash = `#/watch/${name}`;
+  window.location.hash = `#/fold/${name}`;
   return name;
 }
 
-/** Build the timeline of a model in Python and open it in Watch (a broken step shows the steps before it). */
+/** Build the timeline of a model in Python and open it in Fold (a broken step shows the steps before it). */
 export async function openModel(model: unknown, label: string): Promise<OpenResult> {
   const m = model as ModelJson;
   if (!m || typeof m !== "object" || !Array.isArray(m.steps)) {
@@ -39,7 +39,7 @@ export async function openModel(model: unknown, label: string): Promise<OpenResu
   await ensurePython("core");
   const r = await call("timeline", { model: m });
   if (!r.timeline) return { ok: false, note: r.error ?? "Could not fold this model." };
-  showInWatch(m, r.timeline, m.title ?? label);
+  showInFold(m, r.timeline, m.title ?? label);
   if (r.error) return { ok: true, note: `Step ${r.failed_step} could not be folded (${r.error}). Showing the ${r.shown_steps} steps before it.` };
   return { ok: true };
 }

@@ -522,6 +522,16 @@ class TimelineBuilder:
         self.steps.append(st)
         return st
 
+    def seed(self, states: list[dict], steps: list[dict]) -> None:
+        """Take over the states and steps of a timeline already built for the same paper and steps."""
+        if len(states) != len(steps) + 1:
+            raise ValueError(f"seed needs one more state than steps, got {len(states)} and {len(steps)}")
+        world = []
+        for sj in states:
+            w = sj["world"]
+            world.append((np.vstack([np.asarray(w["M"], dtype=float), [0.0, 0.0, 1.0]]), int(w["s"]), float(w["zoff"])))
+        self.states, self.steps, self._world = list(states), list(steps), world
+
     def pop(self, n: int = 1) -> None:
         if n < 0 or n > len(self.steps):
             raise IndexError(f"can't pop {n} of {len(self.steps)} steps")

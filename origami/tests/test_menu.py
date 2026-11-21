@@ -193,7 +193,7 @@ def test_text_goal_mode_leaks_nothing_from_the_target(tmp_path):
             assert bad not in text, bad
         assert target_img not in imgs
         assert len(imgs) == 2  # own paper + menu thumbnails only
-    assert set(s["variants"]) == {"hat", "hat_behind"}
+    assert s["variants"] == {}  # the model lists no alternative endings
     # control: the default (image) goal does show the target picture and par
     fake2 = _FakeClient()
     run_episode_menu("models/hat.json", "fake/model", out_root=tmp_path, client=fake2)

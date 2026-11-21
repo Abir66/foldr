@@ -114,6 +114,30 @@ def test_bridge_session_round_trip():
     assert not files["errors"]
 
 
+@pytest.mark.parametrize("kind,p,q", [
+    ("through", [0.3, 0.0], [0.7, 1.0]),  # two points on edges
+    ("through", [0.2, 0.5], [0.8, 0.55]),  # two free points inside the paper
+    ("onto", [0.123456789, 0.0], [0.9, 1.0]),  # edge point onto edge point
+    ("onto", "C", [0.4, 0.3]),  # labeled corner onto a free point
+])
+def test_bridge_custom_free_points(kind, p, q):
+    _call("session.new", {"size": 1, "colored_side": "up"})
+    r = _call("session.custom", {"p": p, "q": q, "kind": kind, "preview": True})
+    assert r["ok"] and r["rev"] == 0 and r["state"]["faces"]
+    for pt in r["step"]["line"][kind]:
+        if isinstance(pt, list):
+            assert all(round(v, 4) == v for v in pt)
+    r = _call("session.custom", {"p": p, "q": q, "kind": kind})
+    assert r["ok"] and r["rev"] == 1
+    assert _call("session.steps")["model"]["steps"][0]["line"] == r["step"]["line"]
+
+
+def test_bridge_custom_rejects_off_paper_line():
+    _call("session.new", {"size": 1, "colored_side": "up"})
+    r = _call("session.custom", {"p": [2.0, 2.0], "q": [3.0, 2.5], "kind": "through", "preview": True})
+    assert not r["ok"] and r["rev"] == 0
+
+
 def test_bridge_timeline_partial_and_errors():
     model = json.load(open("models/cup.json"))
     bad = dict(model, steps=model["steps"][:2] + [{"op": "nope"}])
@@ -128,3 +152,39 @@ def test_core_imports_without_matplotlib():
             "print('matplotlib' in sys.modules)")
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "False"
+
+
+def _session_view(s):
+    env = s.env
+    return json.dumps({"state": s.builder.states[-1], "len": len(s.builder), "steps": s.builder.steps,
+            "traj": env.trajectory, "open": [(i.kind, i.message) for i in env.open_issues],
+            "undo": len(env._undo_stack), "stats": env.stats}, sort_keys=True)
+
+
+@pytest.mark.parametrize("seeded", [False, True])
+def test_bridge_session_load_matches_sequential_apply(seeded):
+    from origami.steps_export import build_timeline
+
+    model = json.load(open("models/cup.json"))
+    k = 6  # ends just after the flip
+    _call("session.new", {"size": model["paper"].get("size", 1), "colored_side": model["paper"].get("colored_side", "up")})
+    for st in model["steps"][:k]:
+        assert _call("session.apply", {"step": st})["ok"]
+    want = _session_view(bridge._SESSION)
+    want_undo = _call("session.undo", {"n": 2})["state"]
+
+    params = {"model": model, "k": k}
+    if seeded:
+        tl = json.loads(json.dumps(build_timeline(model)))
+        params["timeline"] = {"states": tl["states"], "steps": tl["steps"]}
+    out = _call("session.load", params)
+    assert out["timeline_len"] == k and (out["timeline"] is None) == seeded
+    got = _session_view(bridge._SESSION)
+    assert got == want
+    assert _call("session.undo", {"n": 2})["state"] == want_undo
+    assert _call("session.apply", {"step": model["steps"][k - 2]})["ok"]
+
+
+def test_bridge_session_load_rejects_a_bad_step():
+    out = json.loads(bridge.call("session.load", json.dumps({"model": {"steps": [{"op": "valley", "line": "nope"}]}})))
+    assert "step 1" in out["exception"]["message"]

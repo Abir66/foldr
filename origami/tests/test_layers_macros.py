@@ -22,7 +22,8 @@ def run(steps):
 
 
 def load(name):
-    return json.loads((MODELS / f"{name}.json").read_text())
+    base = MODELS.parent / "tests" / "data" / "models" if name == "hat_tuck" else MODELS
+    return json.loads((base / f"{name}.json").read_text())
 
 
 def face_at(state, orig_pt):
@@ -42,7 +43,7 @@ def assert_consistent(state):
 # ---- tuck ---------------------------------------------------------------------------
 
 def test_hat_back_flap_is_tucked_inside():
-    st = run_model(load("hat"))[-1]
+    st = run_model(load("hat_tuck"))[-1]
     assert_consistent(st)
     (flap,) = face_at(st, (0.1, 0.1))  # the back bottom corner (bl), tucked up
     over = [i for i, j in st.above if j == flap]

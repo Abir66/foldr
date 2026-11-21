@@ -6,9 +6,10 @@ const fake = (name: string) => ({ name }) as Example;
 setExamples(["crane", "cup", "hat"].map(fake));
 
 describe("parseHash", () => {
-  it("defaults to watching the crane", () => {
+  it("defaults to the crane in Fold", () => {
     const r = parseHash("");
-    expect(r.mode).toBe("watch");
+    expect(r.mode).toBe("fold");
+    expect(r.own).toBe(false);
     expect(r.example).toBe("crane");
   });
   it("reads watch example and hash query", () => {
@@ -20,7 +21,9 @@ describe("parseHash", () => {
     expect(parseHash("#/watch/nope").example).toBe("crane");
   });
   it("reads fold and ai routes", () => {
-    expect(parseHash("#/fold").mode).toBe("fold");
+    expect(parseHash("#/fold").own).toBe(true);
+    expect(parseHash("#/fold/hat").example).toBe("hat");
+    expect(parseHash("#/watch/hat").mode).toBe("fold");
     const ai = parseHash("#/ai/opus-hat-text");
     expect(ai.mode).toBe("ai");
     expect(ai.run).toBe("opus-hat-text");
@@ -30,7 +33,7 @@ describe("parseHash", () => {
     expect(stepParam(r.params, 20)).toBe(20);
   });
   it("builds hrefs", () => {
-    expect(hrefFor("watch", "hat")).toBe("#/watch/hat");
+    expect(hrefFor("fold", "hat")).toBe("#/fold/hat");
     expect(hrefFor("ai")).toBe("#/ai");
     expect(hrefFor("fold")).toBe("#/fold");
   });

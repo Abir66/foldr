@@ -24,12 +24,12 @@ export interface ViewerColors {
 }
 
 export const DEFAULT_COLORS: ViewerColors = {
-  front: 0x2f5da8,
-  back: 0xfbfbf8,
-  edge: 0x1e2422,
-  crease: 0xf07c2e,
-  valley: 0xf07c2e,
-  mountain: 0xc8381f,
+  front: 0xe07a3f,
+  back: 0xfbf6ec,
+  edge: 0x3a2a1a,
+  crease: 0x5c3d24,
+  valley: 0x2a211a,
+  mountain: 0xb3261e,
   unfold: 0x6b6b6b,
   flip: 0x444444,
   label: "#1E2422",
@@ -282,6 +282,8 @@ export class PaperViewer {
   private dirGoal: THREE.Vector3 | null = null; // view direction resetView eases to
   private lastFrame = 0;
   private touches = new Set<number>();
+  private orthoScale = 1; // Flat view zoom (> 1 = closer)
+  private orthoShift = new THREE.Vector3(); // Flat view pan, world units
 
   constructor(host: HTMLElement, opts: ViewerOptions = {}) {
     this.host = host;
@@ -533,6 +535,9 @@ export class PaperViewer {
 
   /** Default camera: working side of the paper, framing the shown state; the camera follows it again. */
   resetView(k = this.cur, opts: { smooth?: boolean } = {}) {
+    this.orthoScale = 1;
+    this.orthoShift.set(0, 0, 0);
+    if (this.topDown) this.placeOrtho();
     const st = this.tl.states[Math.min(k, this.tl.states.length - 1)];
     const sd = st ? st.world.s : 1;
     const dir = new THREE.Vector3(-sd * 0.35, -0.8, sd * 1.8).normalize();
@@ -941,9 +946,35 @@ export class PaperViewer {
     cam.lookAt(tg);
   }
 
+  /** Flat view: zoom by factor f keeping the paper under the screen point still. */
+  zoomFlat(clientX: number, clientY: number, f: number) {
+    if (!this.topDown) return;
+    const ndc = this.ndc(clientX, clientY);
+    const before = ndc.clone().unproject(this.ortho);
+    this.orthoScale = Math.min(20, Math.max(0.3, this.orthoScale * f));
+    this.placeOrtho();
+    this.orthoShift.add(before.sub(ndc.unproject(this.ortho))).setZ(0);
+    this.placeOrtho();
+  }
+
+  /** Flat view: move the paper by a screen-pixel offset. */
+  panFlat(dx: number, dy: number) {
+    if (!this.topDown) return;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const o = new THREE.Vector3(0, 0, 0).unproject(this.ortho);
+    const d = new THREE.Vector3((2 * dx) / r.width, (-2 * dy) / r.height, 0).unproject(this.ortho);
+    this.orthoShift.sub(d.sub(o)).setZ(0);
+    this.placeOrtho();
+  }
+
+  private ndc(clientX: number, clientY: number) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return new THREE.Vector3(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1, 0);
+  }
+
   private placeOrtho() {
     const side = this.tl.states[this.cur]?.world.s ?? 1;
-    const half = this.span * 0.62,
+    const half = (this.span * 0.62) / this.orthoScale,
       aspect = this.width / this.height;
     const o = this.ortho;
     o.left = -half * Math.max(1, aspect);
@@ -952,9 +983,11 @@ export class PaperViewer {
     o.bottom = -half / Math.min(1, aspect);
     o.near = 0.01;
     o.far = 10 * this.span;
-    o.position.set(this.center.x, this.center.y, side * 4 * this.span);
+    const c = this.center.clone().add(this.orthoShift);
+    o.position.set(c.x, c.y, side * 4 * this.span);
     o.up.set(0, side, 0);
-    o.lookAt(this.center);
+    o.lookAt(c);
+    o.updateMatrixWorld();
     o.updateProjectionMatrix();
   }
 

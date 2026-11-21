@@ -28,7 +28,7 @@ SCHEMA = ROOT / "docs" / "events.schema.json"
 CURATED = {
     "opus-hat-text": dict(
         path="textgoal/opus/run1/2026-11-21/anthropic_claude-opus-5.5_menu/hat",
-        title="Folds a samurai helmet from words only", model="Claude Opus", example="hat_behind",
+        title="Folds a samurai helmet from words only", model="Claude Opus", example="hat",
         blurb="No picture of the result: only one sentence. It writes its own plan, then picks folds from the menu."),
     "opus-hat-menu": dict(
         path="opus_hat/2026-11-20/anthropic_claude-opus-5.5_menu/hat",

@@ -14,6 +14,9 @@ timeline step JSON, `points` = tappable points, `rev` = session revision (bumped
   init            {stage: "core"|"export"}            -> {versions, stage}
   timeline        {model}                             -> {timeline|null, error|null, failed_step|null, shown_steps}
   session.new     {size?, colored_side?}              -> {rev, state, timeline, points}
+  session.load    {model, k?, timeline?}              -> {rev, state, points, timeline_len, timeline|null}
+                  a new session holding the model's first k steps; timeline = {states, steps} already built
+                  for them (then not rebuilt, and the result's timeline is null)
   session.apply   {step}                              -> {rev, ok, code, text, timeline_step?, state?, points?}
   session.preview {step}                              -> {rev, ok, code, text, state?, line?, move?}
                   line = fold line clipped to the paper's bbox [[x,y],[x,y]], move = the point that moves
@@ -35,6 +38,7 @@ Errors: call() returns {"exception": {"type", "message"}} instead of raising.
 from __future__ import annotations
 
 import base64
+import copy
 import io
 import json
 import re
@@ -255,6 +259,47 @@ class Session:
         out["rev"] = self.rev
         return out
 
+    def load(self, steps: list, seed: dict | None = None) -> dict:
+        """Replay steps from the flat sheet in one go: no per-step physics check, notes or points.
+        seed = {states, steps} of the timeline already built for these steps (skips rebuilding it)."""
+        from ..env import _Snap, is_view, normalize_action
+        from ..validate import STATE_KINDS, check_step
+
+        if not isinstance(steps, list):
+            raise ValueError('session.load needs a "steps" list')
+        env = self.env
+        last = None  # (state before, step, number) of the last real fold, for the open issues
+        for i, raw in enumerate(steps):
+            act = normalize_action(raw, env.size)
+            before = env.state
+            sim = copy.deepcopy(env.sim)
+            try:
+                sim.apply(act)
+            except Exception as e:  # noqa: BLE001
+                raise ValueError(f"step {i + 1} could not be folded: {type(e).__name__}: {e}") from e
+            # the old sim is never touched again, so the undo snapshot can hold it without a copy
+            env._undo_stack.append(_Snap(env.sim, list(env.trajectory), list(env.open_issues)))
+            env.sim = sim
+            env.trajectory.append(act)
+            if is_view(act):
+                env.stats["view_ops"] += 1
+            else:
+                env.stats["executed"] += 1
+                last = (before, act, i + 1)
+            if seed is None:
+                self.builder.append(act, before, env.state)
+        if seed is not None:
+            self.builder.seed(seed["states"][: len(steps) + 1], seed["steps"][: len(steps)])
+        if last is not None:
+            issues = check_step(last[0], env.state, last[1], last[2], env.strict)
+            env.open_issues = [x for x in issues if x.kind in STATE_KINDS]
+        if steps:
+            env.visited.add(env.state, len(env.trajectory))
+            self.rev += 1
+        out = self.state()
+        out["timeline"] = None if seed is not None else self.builder.to_dict()
+        return out
+
     def preview(self, step) -> dict:
         from ..steps_export import state_json
 
@@ -337,12 +382,13 @@ class Session:
         return step
 
     def _pt(self, spec):
-        """Point label (from `points`) -> its sheet name; [x, y] (folded coords) passes through."""
+        """Point label (from `points`) -> its sheet name; [x, y] (folded coords) is rounded to 4 decimals."""
         if isinstance(spec, str):
             nm = self.env.labeler.internal(spec)
             return nm if nm is not None else spec
         if isinstance(spec, (list, tuple)) and len(spec) == 2:
-            return [float(spec[0]), float(spec[1])]
+            x, y = round(float(spec[0]), 4), round(float(spec[1]), 4)
+            return [x + 0.0, y + 0.0]
         raise ValueError(f"bad point {spec!r}")
 
     def _side_point(self, p, q, side: int):
@@ -430,11 +476,28 @@ def session_new(params: dict) -> dict:
     return {"rev": s.rev, "state": s.builder.states[-1], "timeline": s.builder.to_dict(), "points": s.points()}
 
 
+def session_load(params: dict) -> dict:
+    """New session holding the first k steps of a model (all of them without k)."""
+    global _SESSION
+    model = params.get("model") or {}
+    paper = model.get("paper") or {}
+    steps = model.get("steps")
+    if not isinstance(steps, list):
+        raise ValueError('session.load needs a model with a "steps" list')
+    k = params.get("k")
+    steps = steps if k is None else steps[: max(0, int(k))]
+    s = Session(paper.get("size", 1.0), paper.get("colored_side", "up"))
+    out = s.load(steps, params.get("timeline"))
+    _SESSION = s
+    return out
+
+
 METHODS = {
     "init": lambda p, _: init(p),
     "timeline": lambda p, _: timeline(p),
     "export": lambda p, _: export(p),
     "session.new": lambda p, _: session_new(p),
+    "session.load": lambda p, _: session_load(p),
     "session.apply": lambda p, _: _session().apply(p.get("step")),
     "session.preview": lambda p, _: _session().preview(p.get("step")),
     "session.undo": lambda p, _: _session().undo(int(p.get("n", 1))),

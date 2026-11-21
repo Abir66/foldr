@@ -11,11 +11,13 @@ from origami.kinematics import frames
 from origami.steps_export import build_timeline
 
 MODELS = Path(__file__).resolve().parent.parent / "models"
+DATA = Path(__file__).resolve().parent / "data" / "models"
 
 
 @lru_cache(maxsize=None)
 def _tl(name):
-    return build_timeline(json.loads((MODELS / f"{name}.json").read_text()))
+    path = DATA / f"{name}.json" if name == "hat_tuck" else MODELS / f"{name}.json"
+    return build_timeline(json.loads(path.read_text()))
 
 
 def _tuck_step(name):
@@ -23,7 +25,7 @@ def _tuck_step(name):
 
 
 def test_hat_tuck_uses_scripted_slide_in():
-    s = _tuck_step("hat")
+    s = _tuck_step("hat_tuck")
     assert s["index"] == 10 and s["tuck_anim"]["cover"]
     assert all(p.get("fkeys") for p in s["pieces"])
 
@@ -34,7 +36,7 @@ def test_crane_narrowing_tucks_keep_plain_path():
 
 
 def test_hat_tuck_flap_stays_hinged_and_under_the_cover():
-    s = _tuck_step("hat")
+    s = _tuck_step("hat_tuck")
     P = s["pieces"]
     cover = set(s["tuck_anim"]["cover"])
     mov = [i for i, p in enumerate(P) if p["moving"]]

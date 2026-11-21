@@ -1,11 +1,10 @@
 {
   "name": "hat",
-  "title": "Samurai helmet (kabuto), simple version",
-  "purpose": "A samurai helmet (kabuto) you could wear: two horns sticking out at the top, a brim across the front, and an opening at the bottom for the head.",
+  "title": "Samurai helmet",
   "paper": {
     "size": 1.0
   },
-  "description": "Classic kabuto. The last step tucks the back bottom flap up INSIDE the helmet (into the pocket between the back layer and the front layers).",
+  "description": "Classic kabuto: the last step folds the back bottom flap up BEHIND the helmet (mountain fold on the back layer).",
   "notes": "O = middle of the diamond = {mid: [center, bl]}. Horns use 'bisect' (fold the ear's centre line onto its half-edge line) so the tip points out at 45 degrees; 'flap': true keeps the fold to one ear.",
   "steps": [
     {
@@ -196,7 +195,7 @@
       "description": "Fold that band up again along the horns' base line."
     },
     {
-      "op": "valley",
+      "op": "mountain",
       "line": {
         "horizontal": {
           "mid": [
@@ -206,11 +205,10 @@
         }
       },
       "move": "bl",
-      "tuck": "inside",
-      "description": "Tuck the back bottom flap up inside the helmet (between the back layer and the front layers). Open the bottom: done!"
+      "layers": {
+        "bottom": 1
+      },
+      "description": "Fold the back bottom flap up behind the helmet (mountain fold, back layer only). Open the bottom: done!"
     }
-  ],
-  "alternatives": [
-    "hat_behind.json"
   ]
 }

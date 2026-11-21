@@ -11,7 +11,7 @@
   "text": "Fold a samurai helmet (kabuto) from one square sheet of paper (coloured on one side). It should be something you could wear: two horns sticking out at the top, a brim across the front, and an opening at the bottom for the head.",
   "target": "hat"
  },
- "example": "hat_behind",
+ "example": "hat",
  "outcome": {
   "passed": true,
   "stopReason": "submitted",

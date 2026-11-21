@@ -38,16 +38,17 @@ def set_layer_offset(v: float) -> None:
     LAYER_OFFSET = float(v)
 
 
-def _layer_depths(state: PaperState) -> list[int]:
-    """For each face: how many faces below it overlap it."""
+def _layer_depths(state: PaperState, order: list[int] | None = None) -> list[int]:
+    """For each face: how many faces painted before it (default: below it) overlap it."""
     polys = [f.folded for f in state.faces]
-    return [
-        sum(g.overlap_area(polys[i], polys[j]) > 1e-6 for j in range(i))
-        for i in range(len(polys))
-    ]
+    order = list(range(len(polys))) if order is None else order
+    d = [0] * len(polys)
+    for n, i in enumerate(order):
+        d[i] = sum(g.overlap_area(polys[i], polys[j]) > 1e-6 for j in order[:n])
+    return d
 
 
-def _draw_bend_cap(ax, state: PaperState, bend: dict, shifts, z: float) -> None:
+def _draw_bend_cap(ax, state: PaperState, bend: dict, shifts, z: float, back: bool = False) -> None:
     """Join two stacked layers along a fold edge: a small rounded cap of paper wrapping round it."""
     fa, fb = state.faces[bend["a"]], state.faces[bend["b"]]
     p, q = (g.apply(fa.T, np.array(pt)) for pt in bend["seg"])
@@ -64,29 +65,37 @@ def _draw_bend_cap(ax, state: PaperState, bend: dict, shifts, z: float) -> None:
     ts = np.linspace(0, 1, 13)
     arc = lambda e: [e + sa + t * d + n * h * np.sin(np.pi * t) for t in ts]
     poly = np.array(arc(p) + arc(q)[::-1])
-    color = FRONT_COLOR if fb.front_up else BACK_COLOR
+    color = FRONT_COLOR if fb.front_up != back else BACK_COLOR
     ax.add_patch(Polygon(poly, closed=True, facecolor=color, edgecolor=EDGE_COLOR, linewidth=1.2,
                          joinstyle="round", zorder=z))
 
 
-def draw_state(ax, state: PaperState) -> None:
+def draw_state(ax, state: PaperState, back: bool = False) -> None:
+    """Paint faces bottom-up so upper layers hide what is under them. back=True: seen from below
+    (layers in reverse, other side's colour); the caller mirrors the x axis."""
+    order = list(range(len(state.faces)))
+    if back:
+        order.reverse()
     off_dir = np.array([-1.0, 1.0]) / np.sqrt(2) * LAYER_OFFSET * state.size
-    depths = _layer_depths(state)
+    depths = _layer_depths(state, order)
     shifts = [off_dir * min(d, 6) for d in depths]
+    rank = {k: i for i, k in enumerate(order)}
     bends = _bends(state)
-    for k, (f, shift) in enumerate(zip(state.faces, shifts)):
+    for i, k in enumerate(order):
+        f, shift = state.faces[k], shifts[k]
+        z = 1 + i * 0.01
         poly = f.folded + shift
-        ax.add_patch(Polygon(poly, closed=True, facecolor=FRONT_COLOR if f.front_up else BACK_COLOR,
-                             edgecolor=EDGE_COLOR, linewidth=1.2, joinstyle="round", zorder=1 + k * 0.01))
-        for b in bends:
-            if b["b"] == k:
-                _draw_bend_cap(ax, state, b, shifts, 1 + k * 0.01 + 0.005)
+        ax.add_patch(Polygon(poly, closed=True, facecolor=FRONT_COLOR if f.front_up != back else BACK_COLOR,
+                             edgecolor=EDGE_COLOR, linewidth=1.2, joinstyle="round", zorder=z))
+        for b in bends:  # cap goes with whichever of its two faces is painted later
+            if k in (b["a"], b["b"]) and rank[k] == max(rank[b["a"]], rank[b["b"]]):
+                _draw_bend_cap(ax, state, b, shifts, z + 0.005, back)
         for c in state.creases:  # crease lines visible on this face
             seg = g.clip_segment(np.array(c.p), np.array(c.q), f.orig)
             if seg is None:
                 continue
             p, q = g.apply(f.T, np.array(seg)) + shift
-            ax.plot([p[0], q[0]], [p[1], q[1]], color=CREASE_COLOR, linewidth=0.7, zorder=1 + k * 0.01 + 0.002)
+            ax.plot([p[0], q[0]], [p[1], q[1]], color=CREASE_COLOR, linewidth=0.7, zorder=z + 0.002)
 
 
 def _line_extent(state: PaperState, a, u, pad: float):
@@ -151,17 +160,29 @@ def draw_next_step(ax, state: PaperState, step: dict) -> None:
         ax.text(center[0], hi[1] + 0.08 * span, "unfold", ha="center", fontsize=11)
 
 
-def render_step_png(path, state: PaperState, title: str, next_step: dict | None, limits) -> None:
-    fig, ax = plt.subplots(figsize=(6, 6.4), dpi=110)
-    draw_state(ax, state)
-    if next_step is not None:
-        draw_next_step(ax, state, next_step)
+def render_step_png(path, state: PaperState, title: str, next_step: dict | None, limits, sides: bool = True) -> None:
+    """One step picture. sides=True: front (with the next-step hint) and back side by side."""
     (x0, y0), (x1, y1) = limits
-    ax.set_xlim(x0, x1)
-    ax.set_ylim(y0, y1)
-    ax.set_aspect("equal")
-    ax.axis("off")
-    ax.set_title(title, fontsize=11, wrap=True)
+    if not sides:
+        fig, ax = plt.subplots(figsize=(6, 6.4), dpi=110)
+        axes = [ax]
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(11, 6.2), dpi=110)
+    for i, ax in enumerate(axes):
+        back = i == 1
+        draw_state(ax, state, back)
+        if next_step is not None and not back:
+            draw_next_step(ax, state, next_step)
+        ax.set_xlim(x1, x0) if back else ax.set_xlim(x0, x1)
+        ax.set_ylim(y0, y1)
+        ax.set_aspect("equal")
+        ax.axis("off")
+        if sides:
+            ax.set_title("back" if back else "front", fontsize=9, color="#6b5a4a")
+    if sides:
+        fig.suptitle(title, fontsize=11, wrap=True)
+    else:
+        axes[0].set_title(title, fontsize=11, wrap=True)
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)

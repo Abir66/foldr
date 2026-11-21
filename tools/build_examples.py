@@ -39,14 +39,13 @@ LABELS = {
     "crane": "Crane",
     "cup": "Paper cup",
     "hat": "Samurai helmet",
-    "hat_behind": "Samurai helmet, back folded behind",
     "fortune_teller": "Fortune teller",
     "bird_base": "Bird base",
     "triangle": "Triangle",
 }
 
 # Paper colours of the thumbnails (SVG files are shown as images, so no CSS variables).
-FRONT, BACK, INK = "#2f5da8", "#fbfbf8", "#1e2422"
+FRONT, BACK, INK = "#e07a3f", "#fbf6ec", "#3a2a1a"
 
 
 def thumb_svg(state: dict) -> str:

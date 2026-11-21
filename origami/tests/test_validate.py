@@ -17,7 +17,8 @@ CLEAN = ["triangle", "cup", "hat", "fortune_teller", "bird_base", "crane"]
 PETAL_VERTICES = [(0.793, 0.5), (0.5, 0.207), (0.5, 0.793), (0.207, 0.5)]
 
 def load(name):
-    return json.loads((MODELS / f"{name}.json").read_text())
+    base = MODELS.parent / "tests" / "data" / "models" if name == "hat_tuck" else MODELS
+    return json.loads((base / f"{name}.json").read_text())
 
 
 def kinds(rep, severity="error"):
@@ -33,7 +34,7 @@ def test_clean_models_have_no_errors(name):
 
 
 def test_hat_tuck_is_only_a_warning():
-    rep = validate_model(load("hat"))
+    rep = validate_model(load("hat_tuck"))
     assert [(i.step, i.kind) for i in rep.issues] == [(10, "tuck")]
 
 
