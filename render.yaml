@@ -1,0 +1,25 @@
+# Render blueprint: the backend only (the frontend is on GitHub Pages).
+# AI stays off until you set FOLDR_AI_ENABLED=1 and a provider key in the dashboard.
+services:
+  - type: web
+    name: foldr-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: FOLDR_CONFIG
+        value: /app/backend/config.example.toml
+      - key: FOLDR_AI_ENABLED
+        value: "0"
+      - key: FOLDR_ALLOW_USER_KEYS
+        value: "0"
+      - key: FOLDR_DAILY_USD
+        value: "3"
+      - key: FOLDR_CORS_ORIGINS
+        value: https://YOURNAME.github.io
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

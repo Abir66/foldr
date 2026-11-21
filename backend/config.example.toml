@@ -1,0 +1,74 @@
+# Copy to backend/foldr.toml (git-ignored) and edit. Or point FOLDR_CONFIG at any path.
+# Keys never go in this file: put them in environment variables or backend/.env (see .env.example).
+# Env overrides: FOLDR_AI_ENABLED, FOLDR_ALLOW_USER_KEYS, FOLDR_PER_RUN_USD, FOLDR_DAILY_USD,
+# FOLDR_MAX_TURNS, FOLDR_CORS_ORIGINS (comma separated), FOLDR_MODELS_DIR.
+
+[ai]
+enabled = true                  # master switch. false (or FOLDR_AI_ENABLED=0): no endpoint calls any model
+allow_user_keys = false         # visitors may paste their own key; used for that one run, never stored or logged
+require_https_for_user_keys = true   # refuse pasted keys unless the request came over https (localhost is fine)
+max_concurrent_runs = 1         # runs using the server's keys at the same time
+max_user_key_runs = 2           # runs using pasted keys at the same time
+max_turns = 40                  # most turns a run may ask for
+per_run_usd = 1.00              # server-key cap per run, checked before every model call
+daily_usd = 3.00                # server-key cap per UTC day. In memory: a restart resets it, so ALSO set a
+                                # spend limit in your provider's dashboard
+max_run_minutes = 20
+ip_cooldown_s = 60              # one new run per visitor IP per this many seconds (0 = off)
+cors_origins = ["https://YOURNAME.github.io"]   # localhost:5173 / :8000 are always allowed
+
+# Built-in provider names that need no table here: openrouter, openai, anthropic, ollama, lmstudio, scripted.
+# A [providers.X] table adds a new one or changes a built-in field. api_key_env = "" means "no key needed"
+# (local server): such models are free, so they need no price.
+
+[providers.openrouter]
+kind = "openai"                  # any OpenAI-compatible chat completions server
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+reports_cost = true              # the response says what each call cost, so no price is needed below
+
+[providers.anthropic]
+kind = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+
+[providers.ollama]
+kind = "openai"
+base_url = "http://localhost:11434/v1"
+api_key_env = ""
+
+# ---- models shown in the UI -------------------------------------------------------------------------
+# id = what the provider calls it. key = what the UI/API calls it (default: id); only set it when two providers
+# serve the same id. price = USD per 1M tokens: required for server-key models of providers that don't report
+# cost (copy from the provider's pricing page; the values below were not re-checked).
+
+# Works offline with no key: replays a hand-written cup fold (command mode). Handy to test the setup.
+[[models]]
+id = "demo"
+provider = "scripted"
+label = "Offline demo (cup, no AI)"
+script = "examples/models/cup.json"
+default = true
+
+[[models]]
+id = "anthropic/claude-sonnet-5.5"
+provider = "openrouter"
+label = "Claude Sonnet 5.5 (OpenRouter)"
+images = true
+reasoning = true
+
+[[models]]
+id = "claude-sonnet-5-5"
+provider = "anthropic"
+label = "Claude Sonnet 5.5 (Anthropic)"
+price = { input = 2.0, output = 10.0, cached_input = 0.10 }
+
+[[models]]
+id = "claude-haiku-5-5"
+provider = "anthropic"
+label = "Claude Haiku 5.5 (Anthropic)"
+price = { input = 0.10, output = 0.50, cached_input = 0.01 }
+
+# [[models]]
+# id = "llama3.2-vision"
+# provider = "ollama"
+# label = "Llama 3.2 Vision (local)"
