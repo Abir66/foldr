@@ -1,0 +1,27 @@
+{
+  "name": "cup",
+  "title": "Paper cup (traditional)",
+  "purpose": "A drinking cup: the top must open into a pocket you could pour water into, so it can hold liquid.",
+  "paper": {"size": 1.0},
+  "notes": "No magic numbers: the bisector of the left corner's angle meets the right edge at the pivot point, sqrt(2)-1 below the top. Folding the right corner onto the left edge with the crease through that pivot makes the flap's top edge level.",
+  "steps": [
+    {"op": "rotate", "degrees": 45,
+     "description": "Turn the square so it sits like a diamond."},
+    {"op": "valley", "line": {"through": ["tl", "br"]}, "move": "bl",
+     "description": "Fold the bottom corner up to the top corner to make a triangle."},
+    {"op": "valley",
+     "line": {"point_onto_line": "br", "line": ["tl", "tr"],
+              "pivot": {"intersect": [{"bisect": [["tl", "br"], ["tl", "tr"]]}, ["br", "tr"]]}},
+     "description": "Fold the right corner over to the left edge so the flap's top edge is level."},
+    {"op": "valley",
+     "line": {"point_onto_line": "tl", "line": {"horizontal": "br"}, "pivot": "br", "near": "tr"},
+     "description": "Fold the left corner over to the right side, to the tip of the first flap."},
+    {"op": "valley", "line": {"horizontal": "br"}, "move": "bl",
+     "layers": {"top": 1},
+     "description": "Fold the front top flap down (front layer only)."},
+    {"op": "flip",
+     "description": "Turn the paper over."},
+    {"op": "valley", "line": {"horizontal": "br"}, "move": "tr",
+     "description": "Fold the other top flap down. Open the top: done!"}
+  ]
+}

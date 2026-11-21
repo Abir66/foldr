@@ -1,0 +1,456 @@
+{
+  "name": "crane",
+  "title": "Crane (orizuru)",
+  "paper": {
+    "size": 1.0,
+    "colored_side": "down"
+  },
+  "steps": [
+    {
+      "op": "rotate",
+      "degrees": 45,
+      "description": "Start colored side down. Turn the square so it sits like a diamond."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tr",
+          "bl"
+        ]
+      },
+      "description": "Fold the top corner down to the bottom corner (triangle)."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tl",
+          "br"
+        ]
+      },
+      "description": "Fold the triangle in half, left corner onto right corner."
+    },
+    {
+      "op": "squash",
+      "move": {
+        "lerp": [
+          {
+            "mid": [
+              "center",
+              "bl"
+            ]
+          },
+          "br"
+        ],
+        "t": 0.3
+      },
+      "hinge": [
+        "center",
+        "bl"
+      ],
+      "spine": [
+        "center",
+        "br"
+      ],
+      "description": "Lift the top flap upright on its left edge, open it and squash it flat into a diamond."
+    },
+    {
+      "op": "flip",
+      "description": "Turn over."
+    },
+    {
+      "op": "squash",
+      "move": {
+        "lerp": [
+          {
+            "mid": [
+              "center",
+              "bl"
+            ]
+          },
+          "br"
+        ],
+        "t": 0.3
+      },
+      "hinge": [
+        "center",
+        "bl"
+      ],
+      "spine": [
+        "center",
+        "br"
+      ],
+      "description": "Squash the other flap the same way: preliminary base (square base)."
+    },
+    {
+      "op": "petal",
+      "move": "bl",
+      "line": {
+        "horizontal": {
+          "intersect": [
+            {
+              "bisect": [
+                [
+                  "bl",
+                  "right_mid"
+                ],
+                [
+                  "bl",
+                  "center"
+                ]
+              ]
+            },
+            [
+              "right_mid",
+              "center"
+            ]
+          ]
+        }
+      },
+      "description": "Petal fold: lift the bottom corner of the top layer up along the line through the kite points; the sides fold in."
+    },
+    {
+      "op": "flip",
+      "description": "Turn over."
+    },
+    {
+      "op": "petal",
+      "move": "bl",
+      "line": {
+        "horizontal": {
+          "intersect": [
+            {
+              "bisect": [
+                [
+                  "bl",
+                  "left_mid"
+                ],
+                [
+                  "bl",
+                  "center"
+                ]
+              ]
+            },
+            [
+              "left_mid",
+              "center"
+            ]
+          ]
+        }
+      },
+      "description": "Petal fold this side too: bird base."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "bisect": [
+          [
+            "bl",
+            {
+              "orig": [
+                0.20710678,
+                0.5
+              ]
+            }
+          ],
+          [
+            "bl",
+            "br"
+          ]
+        ]
+      },
+      "move": {
+        "lerp": [
+          {
+            "lerp": [
+              {
+                "orig": [
+                  0.20710678,
+                  0.5
+                ]
+              },
+              "bl"
+            ],
+            "t": 0.4
+          },
+          {
+            "lerp": [
+              "bl",
+              "br"
+            ],
+            "t": 0.3
+          }
+        ],
+        "t": 0.1
+      },
+      "layers": {
+        "top": 1,
+        "flap": true
+      },
+      "description": "Narrow the left lower flap: fold its outer edge (top layer) to the centre line.",
+      "tuck": "inside"
+    },
+    {
+      "op": "valley",
+      "line": {
+        "bisect": [
+          [
+            "bl",
+            {
+              "orig": [
+                0.7928932200000001,
+                0.5
+              ]
+            }
+          ],
+          [
+            "bl",
+            "br"
+          ]
+        ]
+      },
+      "move": {
+        "lerp": [
+          {
+            "lerp": [
+              {
+                "orig": [
+                  0.7928932200000001,
+                  0.5
+                ]
+              },
+              "bl"
+            ],
+            "t": 0.4
+          },
+          {
+            "lerp": [
+              "bl",
+              "br"
+            ],
+            "t": 0.3
+          }
+        ],
+        "t": 0.1
+      },
+      "layers": {
+        "top": 1,
+        "flap": true
+      },
+      "description": "Same on the right.",
+      "tuck": "inside"
+    },
+    {
+      "op": "flip",
+      "description": "Turn over."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "bisect": [
+          [
+            "bl",
+            {
+              "orig": [
+                0.7928932200000001,
+                0.5
+              ]
+            }
+          ],
+          [
+            "bl",
+            "br"
+          ]
+        ]
+      },
+      "move": {
+        "lerp": [
+          {
+            "lerp": [
+              {
+                "orig": [
+                  0.7928932200000001,
+                  0.5
+                ]
+              },
+              "bl"
+            ],
+            "t": 0.4
+          },
+          {
+            "lerp": [
+              "bl",
+              "br"
+            ],
+            "t": 0.3
+          }
+        ],
+        "t": 0.1
+      },
+      "layers": {
+        "top": 1,
+        "flap": true
+      },
+      "description": "Narrow the left lower flap on this side too.",
+      "tuck": "inside"
+    },
+    {
+      "op": "valley",
+      "line": {
+        "bisect": [
+          [
+            "bl",
+            {
+              "orig": [
+                0.5,
+                0.20710678
+              ]
+            }
+          ],
+          [
+            "bl",
+            "br"
+          ]
+        ]
+      },
+      "move": {
+        "lerp": [
+          {
+            "lerp": [
+              {
+                "orig": [
+                  0.5,
+                  0.20710678
+                ]
+              },
+              "bl"
+            ],
+            "t": 0.4
+          },
+          {
+            "lerp": [
+              "bl",
+              "br"
+            ],
+            "t": 0.3
+          }
+        ],
+        "t": 0.1
+      },
+      "layers": {
+        "top": 1,
+        "flap": true
+      },
+      "description": "And the right one.",
+      "tuck": "inside"
+    },
+    {
+      "op": "inside_reverse",
+      "line": {
+        "through": [
+          [
+            0.854,
+            0.25
+          ],
+          [
+            0.554,
+            0.1971019057874605
+          ]
+        ]
+      },
+      "move": [
+        0.84,
+        0.0
+      ],
+      "description": "Inside reverse fold the left thin flap up between the wings (neck)."
+    },
+    {
+      "op": "inside_reverse",
+      "line": {
+        "through": [
+          [
+            0.854,
+            0.25
+          ],
+          [
+            1.154,
+            0.1971019057874605
+          ]
+        ]
+      },
+      "move": [
+        0.868,
+        0.0
+      ],
+      "description": "Inside reverse fold the right thin flap up too (tail)."
+    },
+    {
+      "op": "inside_reverse",
+      "line": {
+        "through": [
+          [
+            0.716,
+            0.601
+          ],
+          [
+            0.5394104814282146,
+            0.6948943125571782
+          ]
+        ]
+      },
+      "move": {
+        "lerp": [
+          [
+            0.716,
+            0.601
+          ],
+          "tr"
+        ],
+        "t": 0.6
+      },
+      "description": "Inside reverse fold the tip of the neck down to make the head."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "horizontal": "center"
+      },
+      "move": {
+        "lerp": [
+          "center",
+          "br"
+        ],
+        "t": 0.5
+      },
+      "layers": {
+        "top": 2,
+        "local": true
+      },
+      "description": "Fold the front wing down along the horizontal line through the centre of the sheet (top of the body; top 2 layers at the wing)."
+    },
+    {
+      "op": "flip",
+      "description": "Turn over."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "horizontal": "center"
+      },
+      "move": {
+        "lerp": [
+          "center",
+          "tl"
+        ],
+        "t": 0.5
+      },
+      "layers": {
+        "top": 2,
+        "local": true
+      },
+      "description": "Fold the other wing down the same way. Crane done!"
+    }
+  ],
+  "description": "Bird base, narrow the lower flaps front and back (tucked inside), inside reverse neck and tail, inside reverse the head, fold both wings down. Wing folds use layers {top: 2, local: true}: the 2 layers are counted only in the stack at the move point (on the wing), then the whole wing flap moves."
+}

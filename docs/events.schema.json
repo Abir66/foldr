@@ -1,0 +1,758 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://foldr.local/events.schema.json",
+ "title": "foldr agent run event",
+ "description": "One event of an agent run (one SSE data: line; id: = seq). Produced by origami.agents.events.RunEvents. Images are sent once as an `image` event and referenced as {\"img\": id} afterwards.",
+ "type": "object",
+ "required": [
+  "seq",
+  "t",
+  "type"
+ ],
+ "properties": {
+  "seq": {
+   "type": "integer",
+   "minimum": 0
+  },
+  "t": {
+   "type": "number",
+   "minimum": 0,
+   "description": "seconds since the run started"
+  },
+  "type": {
+   "enum": [
+    "run_started",
+    "plan",
+    "image",
+    "status",
+    "llm_request",
+    "llm_response",
+    "action",
+    "undo",
+    "error",
+    "run_finished"
+   ]
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 1
+  }
+ },
+ "oneOf": [
+  {
+   "$ref": "#/$defs/run_started"
+  },
+  {
+   "$ref": "#/$defs/plan"
+  },
+  {
+   "$ref": "#/$defs/image"
+  },
+  {
+   "$ref": "#/$defs/status"
+  },
+  {
+   "$ref": "#/$defs/llm_request"
+  },
+  {
+   "$ref": "#/$defs/llm_response"
+  },
+  {
+   "$ref": "#/$defs/action"
+  },
+  {
+   "$ref": "#/$defs/undo"
+  },
+  {
+   "$ref": "#/$defs/error"
+  },
+  {
+   "$ref": "#/$defs/run_finished"
+  }
+ ],
+ "$defs": {
+  "nullable_string": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "img_ref": {
+   "type": "string",
+   "pattern": "^i[0-9]+$"
+  },
+  "usage": {
+   "type": "object",
+   "required": [
+    "input",
+    "output"
+   ],
+   "properties": {
+    "input": {
+     "type": "integer"
+    },
+    "output": {
+     "type": "integer"
+    },
+    "cached": {
+     "type": "integer"
+    },
+    "reasoning": {
+     "type": "integer"
+    },
+    "cost_usd": {
+     "type": [
+      "number",
+      "null"
+     ]
+    }
+   }
+  },
+  "timeline": {
+   "type": "object",
+   "required": [
+    "name",
+    "size",
+    "colored_side",
+    "original_faces",
+    "states",
+    "steps"
+   ],
+   "properties": {
+    "states": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object"
+     }
+    },
+    "steps": {
+     "type": "array",
+     "items": {
+      "type": "object"
+     }
+    }
+   }
+  },
+  "goal_part": {
+   "type": "object",
+   "required": [
+    "kind"
+   ],
+   "properties": {
+    "kind": {
+     "enum": [
+      "goal",
+      "image"
+     ]
+    },
+    "text": {
+     "type": "string"
+    },
+    "img": {
+     "$ref": "#/$defs/img_ref"
+    },
+    "data": {
+     "type": "string",
+     "pattern": "^data:image/png;base64,"
+    },
+    "caption": {
+     "$ref": "#/$defs/nullable_string"
+    }
+   },
+   "description": "Goal pictures carry their data here (run_started is the first event, so no image event can come before it); later events refer to them by img id."
+  },
+  "request_part": {
+   "type": "object",
+   "required": [
+    "kind"
+   ],
+   "oneOf": [
+    {
+     "properties": {
+      "kind": {
+       "const": "goal"
+      },
+      "ref": {
+       "type": "integer",
+       "minimum": 0
+      }
+     },
+     "required": [
+      "ref"
+     ],
+     "description": "index into run_started.goal_parts"
+    },
+    {
+     "properties": {
+      "kind": {
+       "const": "plan"
+      },
+      "ref": {
+       "const": "plan"
+      }
+     },
+     "required": [
+      "ref"
+     ],
+     "description": "the text of the latest plan event"
+    },
+    {
+     "properties": {
+      "kind": {
+       "enum": [
+        "turn",
+        "text"
+       ]
+      },
+      "text": {
+       "type": "string"
+      },
+      "chars": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "text"
+     ]
+    },
+    {
+     "properties": {
+      "kind": {
+       "const": "image"
+      },
+      "img": {
+       "$ref": "#/$defs/img_ref"
+      }
+     },
+     "required": [
+      "img"
+     ]
+    }
+   ]
+  },
+  "tool_call": {
+   "type": "object",
+   "required": [
+    "name",
+    "args"
+   ],
+   "properties": {
+    "name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "args": {
+     "type": [
+      "object",
+      "string"
+     ]
+    }
+   }
+  },
+  "run_started": {
+   "properties": {
+    "type": {
+     "const": "run_started"
+    },
+    "config": {
+     "type": "object",
+     "description": "sanitised start request: no user key (shown as \"<hidden>\"), no picture bytes"
+    },
+    "goal": {
+     "type": "object",
+     "required": [
+      "kind"
+     ],
+     "properties": {
+      "kind": {
+       "enum": [
+        "example",
+        "text",
+        "image"
+       ]
+      },
+      "text": {
+       "$ref": "#/$defs/nullable_string"
+      },
+      "target_name": {
+       "$ref": "#/$defs/nullable_string"
+      },
+      "check_against": {
+       "$ref": "#/$defs/nullable_string"
+      },
+      "scored": {
+       "type": "boolean"
+      }
+     }
+    },
+    "system_prompt": {
+     "type": "string"
+    },
+    "tools": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "required": [
+       "name",
+       "summary"
+      ]
+     }
+    },
+    "goal_parts": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/goal_part"
+     }
+    },
+    "timeline": {
+     "$ref": "#/$defs/timeline"
+    },
+    "limits": {
+     "type": "object",
+     "required": [
+      "max_turns"
+     ],
+     "properties": {
+      "max_turns": {
+       "type": "integer"
+      },
+      "max_free_turns": {
+       "type": "integer"
+      },
+      "usd": {
+       "type": [
+        "number",
+        "null"
+       ]
+      }
+     }
+    }
+   },
+   "required": [
+    "config",
+    "goal",
+    "system_prompt",
+    "tools",
+    "goal_parts",
+    "timeline",
+    "limits"
+   ]
+  },
+  "plan": {
+   "properties": {
+    "type": {
+     "const": "plan"
+    },
+    "source": {
+     "enum": [
+      "text",
+      "model"
+     ]
+    },
+    "model": {
+     "$ref": "#/$defs/nullable_string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "usage": {
+     "type": [
+      "object",
+      "null"
+     ]
+    }
+   },
+   "required": [
+    "source",
+    "text"
+   ]
+  },
+  "image": {
+   "properties": {
+    "type": {
+     "const": "image"
+    },
+    "id": {
+     "$ref": "#/$defs/img_ref"
+    },
+    "data": {
+     "type": "string",
+     "pattern": "^data:image/png;base64,"
+    },
+    "caption": {
+     "$ref": "#/$defs/nullable_string"
+    }
+   },
+   "required": [
+    "id",
+    "data"
+   ]
+  },
+  "status": {
+   "properties": {
+    "type": {
+     "const": "status"
+    },
+    "phase": {
+     "enum": [
+      "thinking",
+      "planning",
+      "menu",
+      "folding"
+     ]
+    },
+    "detail": {
+     "$ref": "#/$defs/nullable_string"
+    }
+   },
+   "required": [
+    "phase"
+   ]
+  },
+  "llm_request": {
+   "properties": {
+    "type": {
+     "const": "llm_request"
+    },
+    "messages": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "required": [
+       "role"
+      ],
+      "properties": {
+       "role": {
+        "enum": [
+         "system",
+         "user",
+         "assistant",
+         "tool"
+        ]
+       },
+       "ref": {
+        "const": "system_prompt"
+       },
+       "text": {
+        "$ref": "#/$defs/nullable_string"
+       },
+       "parts": {
+        "type": "array",
+        "items": {
+         "$ref": "#/$defs/request_part"
+        }
+       },
+       "content": {
+        "$ref": "#/$defs/nullable_string"
+       },
+       "tool_calls": {
+        "type": "array",
+        "items": {
+         "$ref": "#/$defs/tool_call"
+        }
+       }
+      }
+     }
+    },
+    "menu": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "required": [
+       "id",
+       "section",
+       "description",
+       "step"
+      ],
+      "properties": {
+       "id": {
+        "type": "integer"
+       },
+       "section": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "after": {
+        "type": "string"
+       },
+       "step": {
+        "type": "object"
+       }
+      }
+     }
+    },
+    "menu_truncated": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "prompt_chars": {
+     "type": "integer"
+    },
+    "images": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "turn",
+    "messages",
+    "prompt_chars"
+   ]
+  },
+  "llm_response": {
+   "properties": {
+    "type": {
+     "const": "llm_response"
+    },
+    "latency_s": {
+     "type": "number"
+    },
+    "finish_reason": {
+     "enum": [
+      "stop",
+      "tool_calls",
+      "length",
+      "error",
+      null
+     ]
+    },
+    "provider": {
+     "$ref": "#/$defs/nullable_string"
+    },
+    "reasoning": {
+     "$ref": "#/$defs/nullable_string"
+    },
+    "content": {
+     "$ref": "#/$defs/nullable_string"
+    },
+    "tool_calls": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/tool_call"
+     }
+    },
+    "usage": {
+     "$ref": "#/$defs/usage"
+    },
+    "spent_usd": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "turn",
+    "tool_calls",
+    "usage",
+    "spent_usd"
+   ]
+  },
+  "action": {
+   "description": "One executed tool call. timeline_step + state are present only when a step was committed (append to the timeline). Undo is followed by an `undo` event.",
+   "properties": {
+    "type": {
+     "const": "action"
+    },
+    "tool": {
+     "type": "string"
+    },
+    "ok": {
+     "type": [
+      "boolean",
+      "null"
+     ]
+    },
+    "code": {
+     "$ref": "#/$defs/nullable_string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "option": {
+     "type": "integer"
+    },
+    "source": {
+     "enum": [
+      "menu",
+      "custom",
+      "view"
+     ]
+    },
+    "query": {
+     "type": "string"
+    },
+    "section": {
+     "type": "string"
+    },
+    "step": {
+     "type": [
+      "object",
+      "null"
+     ]
+    },
+    "timeline_step": {
+     "type": "object"
+    },
+    "state": {
+     "type": "object"
+    },
+    "timeline_len": {
+     "type": "integer"
+    },
+    "timeline_steps": {
+     "type": "array"
+    },
+    "states": {
+     "type": "array"
+    }
+   },
+   "required": [
+    "turn",
+    "tool",
+    "ok",
+    "text"
+   ],
+   "dependentRequired": {
+    "timeline_step": [
+     "state",
+     "timeline_len"
+    ]
+   }
+  },
+  "undo": {
+   "properties": {
+    "type": {
+     "const": "undo"
+    },
+    "n": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "timeline_len": {
+     "type": "integer",
+     "minimum": 0
+    }
+   },
+   "required": [
+    "n",
+    "timeline_len"
+   ]
+  },
+  "error": {
+   "properties": {
+    "type": {
+     "const": "error"
+    },
+    "kind": {
+     "enum": [
+      "format_error",
+      "ran_out_of_tokens",
+      "provider_error",
+      "budget",
+      "daily_limit",
+      "no_credit",
+      "internal"
+     ]
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "text"
+   ]
+  },
+  "run_finished": {
+   "properties": {
+    "type": {
+     "const": "run_finished"
+    },
+    "stop_reason": {
+     "enum": [
+      "submitted",
+      "turn_limit",
+      "stopped",
+      "budget",
+      "no_action_3x",
+      "no_credit",
+      "daily_limit",
+      "api_error",
+      "error"
+     ]
+    },
+    "score": {
+     "type": [
+      "object",
+      "null"
+     ],
+     "description": "null = not scored (no reference model)",
+     "properties": {
+      "passed": {
+       "type": "boolean"
+      },
+      "m1": {
+       "type": "boolean"
+      },
+      "m2": {
+       "type": "boolean"
+      },
+      "scores": {
+       "type": "object"
+      },
+      "pass_any": {
+       "type": "boolean"
+      }
+     }
+    },
+    "variants": {
+     "type": "object"
+    },
+    "final_images": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/img_ref"
+     }
+    },
+    "solution": {
+     "type": [
+      "object",
+      "null"
+     ],
+     "properties": {
+      "steps": {
+       "type": "array"
+      }
+     }
+    },
+    "totals": {
+     "type": "object",
+     "required": [
+      "turns",
+      "input",
+      "output",
+      "cost_usd",
+      "seconds"
+     ]
+    },
+    "error": {
+     "$ref": "#/$defs/nullable_string"
+    },
+    "timeline_len": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "stop_reason",
+    "score",
+    "final_images",
+    "totals"
+   ]
+  }
+ }
+}

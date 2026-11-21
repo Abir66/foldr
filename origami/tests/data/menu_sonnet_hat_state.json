@@ -1,0 +1,221 @@
+{
+ "note": "Sonnet 5.5 plan+executor hat run 2 (2026-11-21): first 5 moves (square view, not rotated). The kabuto horns and the brim's first fold must be on page 1 of the menu here (regression for buried horn folds).",
+ "moves": [
+  {
+   "op": "valley",
+   "line": {
+    "through": [
+     [
+      1.2071067811865475,
+      -0.20710678118654757
+     ],
+     [
+      -0.20710678118654746,
+      1.2071067811865475
+     ]
+    ]
+   },
+   "move": [
+    0.6666666666666666,
+    0.6666666666666666
+   ],
+   "description": "Fold corner C (now at top-right) onto corner A (now at bottom-left): the top-right part goes down-left (all layers, just one layer here)"
+  },
+  {
+   "op": "valley",
+   "line": {
+    "through": [
+     [
+      0.49999999999999994,
+      -1.0
+     ],
+     [
+      0.5000000000000001,
+      1.0
+     ]
+    ]
+   },
+   "move": [
+    0.6666666666666666,
+    0.16666666666666666
+   ],
+   "description": "Fold corner B (now at bottom-right) onto corner A/C (now at bottom-left): the bottom-right part goes left (all layers, 2 layers move together)"
+  },
+  {
+   "op": "valley",
+   "line": {
+    "through": [
+     [
+      -1.0,
+      0.5
+     ],
+     [
+      1.0,
+      0.5
+     ]
+    ]
+   },
+   "move": [
+    0.1666666666666667,
+    0.6666666666666666
+   ],
+   "description": "Fold corner D (now at top-left) onto corner A/C (now at bottom-left): the top part goes down (all layers, 2 layers move together)"
+  },
+  {
+   "op": "valley",
+   "line": {
+    "through": [
+     [
+      0.9571067811865475,
+      -0.45710678118654763
+     ],
+     [
+      -0.4571067811865474,
+      0.9571067811865475
+     ]
+    ]
+   },
+   "move": [
+    0.24999999999999997,
+    0.08333333333333333
+   ],
+   "layers": {
+    "top": 1,
+    "flap": true
+   },
+   "description": "Fold corner A/C (now at bottom-left) onto corner I (now at top-right): the flap at the bottom goes up-right (front layer only, only this one flap)"
+  },
+  {
+   "op": "valley",
+   "line": {
+    "through": [
+     [
+      0.9571067811865475,
+      -0.45710678118654763
+     ],
+     [
+      -0.4571067811865474,
+      0.9571067811865475
+     ]
+    ]
+   },
+   "move": [
+    0.08333333333333293,
+    0.25
+   ],
+   "layers": {
+    "top": 1
+   },
+   "description": "Fold corner A/C (now at bottom-left) onto corner I/B (now at top-right) (along an existing crease): the left part goes up-right (front layer only)"
+  }
+ ],
+ "horn1": {
+  "op": "valley",
+  "line": {
+   "bisect": [
+    [
+     {
+      "mid": [
+       "center",
+       "bl"
+      ]
+     },
+     "tl"
+    ],
+    [
+     {
+      "mid": [
+       "center",
+       "bl"
+      ]
+     },
+     {
+      "mid": [
+       "tl",
+       "left_mid"
+      ]
+     }
+    ]
+   ]
+  },
+  "move": {
+   "lerp": [
+    "tl",
+    {
+     "mid": [
+      "tl",
+      "left_mid"
+     ]
+    }
+   ],
+   "t": 0.2
+  },
+  "layers": {
+   "top": 2,
+   "flap": true
+  }
+ },
+ "horn2": {
+  "op": "valley",
+  "line": {
+   "bisect": [
+    [
+     {
+      "mid": [
+       "center",
+       "bl"
+      ]
+     },
+     "br"
+    ],
+    [
+     {
+      "mid": [
+       "center",
+       "bl"
+      ]
+     },
+     {
+      "mid": [
+       "br",
+       "right_mid"
+      ]
+     }
+    ]
+   ]
+  },
+  "move": {
+   "lerp": [
+    "br",
+    {
+     "mid": [
+      "br",
+      "right_mid"
+     ]
+    }
+   ],
+   "t": 0.2
+  },
+  "layers": {
+   "top": 2,
+   "flap": true
+  }
+ },
+ "brim_point_up": {
+  "op": "valley",
+  "line": {
+   "onto": [
+    "tr",
+    {
+     "mid": [
+      "center",
+      "bl"
+     ]
+    }
+   ]
+  },
+  "layers": {
+   "top": 1
+  }
+ }
+}

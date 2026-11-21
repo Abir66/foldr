@@ -1,0 +1,11 @@
+{
+  "name": "triangle",
+  "title": "Small triangle (test model)",
+  "paper": {"size": 1.0},
+  "steps": [
+    {"op": "valley", "line": {"through": ["tl", "br"]}, "move": "bl",
+     "description": "Fold in half along the diagonal, bottom-left corner up to top-right."},
+    {"op": "valley", "line": {"onto": ["tl", "br"]},
+     "description": "Fold in half again: left corner onto right corner."}
+  ]
+}

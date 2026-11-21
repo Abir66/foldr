@@ -1,0 +1,146 @@
+{
+  "name": "bird_base",
+  "title": "Bird base (via preliminary base, squash + petal folds)",
+  "paper": {
+    "size": 1.0
+  },
+  "description": "Triangle, fold in half, squash both flaps (preliminary base), then petal fold front and back.",
+  "notes": "Kite points for the petal: where the bisector of the bottom corner (between the lower edge and the centre line) meets the upper edge; written with bisect + intersect.",
+  "steps": [
+    {
+      "op": "rotate",
+      "degrees": 45,
+      "description": "Turn the square so it sits like a diamond."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tr",
+          "bl"
+        ]
+      },
+      "description": "Fold the top corner down to the bottom corner (triangle)."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tl",
+          "br"
+        ]
+      },
+      "description": "Fold the triangle in half, left corner onto right corner."
+    },
+    {
+      "op": "squash",
+      "move": {
+        "lerp": [
+          {
+            "mid": [
+              "center",
+              "bl"
+            ]
+          },
+          "br"
+        ],
+        "t": 0.3
+      },
+      "hinge": [
+        "center",
+        "bl"
+      ],
+      "spine": [
+        "center",
+        "br"
+      ],
+      "description": "Lift the top flap upright on its left edge, open it and squash it flat into a diamond."
+    },
+    {
+      "op": "flip",
+      "description": "Turn over."
+    },
+    {
+      "op": "squash",
+      "move": {
+        "lerp": [
+          {
+            "mid": [
+              "center",
+              "bl"
+            ]
+          },
+          "br"
+        ],
+        "t": 0.3
+      },
+      "hinge": [
+        "center",
+        "bl"
+      ],
+      "spine": [
+        "center",
+        "br"
+      ],
+      "description": "Squash the other flap the same way: preliminary base (square base)."
+    },
+    {
+      "op": "petal",
+      "move": "bl",
+      "line": {
+        "horizontal": {
+          "intersect": [
+            {
+              "bisect": [
+                [
+                  "bl",
+                  "right_mid"
+                ],
+                [
+                  "bl",
+                  "center"
+                ]
+              ]
+            },
+            [
+              "right_mid",
+              "center"
+            ]
+          ]
+        }
+      },
+      "description": "Petal fold: lift the bottom corner of the top layer up along the line through the kite points; the sides fold in."
+    },
+    {
+      "op": "flip",
+      "description": "Turn over."
+    },
+    {
+      "op": "petal",
+      "move": "bl",
+      "line": {
+        "horizontal": {
+          "intersect": [
+            {
+              "bisect": [
+                [
+                  "bl",
+                  "left_mid"
+                ],
+                [
+                  "bl",
+                  "center"
+                ]
+              ]
+            },
+            [
+              "left_mid",
+              "center"
+            ]
+          ]
+        }
+      },
+      "description": "Petal fold this side too: bird base."
+    }
+  ]
+}

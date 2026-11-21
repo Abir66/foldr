@@ -1,0 +1,216 @@
+{
+  "name": "hat",
+  "title": "Samurai helmet (kabuto), simple version",
+  "purpose": "A samurai helmet (kabuto) you could wear: two horns sticking out at the top, a brim across the front, and an opening at the bottom for the head.",
+  "paper": {
+    "size": 1.0
+  },
+  "description": "Classic kabuto. The last step tucks the back bottom flap up INSIDE the helmet (into the pocket between the back layer and the front layers).",
+  "notes": "O = middle of the diamond = {mid: [center, bl]}. Horns use 'bisect' (fold the ear's centre line onto its half-edge line) so the tip points out at 45 degrees; 'flap': true keeps the fold to one ear.",
+  "steps": [
+    {
+      "op": "rotate",
+      "degrees": 45,
+      "description": "Turn the square so it sits like a diamond."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tr",
+          "bl"
+        ]
+      },
+      "description": "Fold the top corner down to the bottom corner to make a triangle."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tl",
+          "bl"
+        ]
+      },
+      "description": "Fold the left corner down to the bottom point."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "br",
+          "bl"
+        ]
+      },
+      "description": "Fold the right corner down to the bottom point. You have a diamond."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tl",
+          "center"
+        ]
+      },
+      "layers": {
+        "top": 2
+      },
+      "description": "Fold the two front flaps' bottom points up to the top point."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "bisect": [
+          [
+            {
+              "mid": [
+                "center",
+                "bl"
+              ]
+            },
+            "tl"
+          ],
+          [
+            {
+              "mid": [
+                "center",
+                "bl"
+              ]
+            },
+            {
+              "mid": [
+                "tl",
+                "left_mid"
+              ]
+            }
+          ]
+        ]
+      },
+      "move": {
+        "lerp": [
+          "tl",
+          {
+            "mid": [
+              "tl",
+              "left_mid"
+            ]
+          }
+        ],
+        "t": 0.2
+      },
+      "layers": {
+        "top": 2,
+        "flap": true
+      },
+      "description": "Fold the left flap's tip out to the side to make a horn."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "bisect": [
+          [
+            {
+              "mid": [
+                "center",
+                "bl"
+              ]
+            },
+            "br"
+          ],
+          [
+            {
+              "mid": [
+                "center",
+                "bl"
+              ]
+            },
+            {
+              "mid": [
+                "br",
+                "right_mid"
+              ]
+            }
+          ]
+        ]
+      },
+      "move": {
+        "lerp": [
+          "br",
+          {
+            "mid": [
+              "br",
+              "right_mid"
+            ]
+          }
+        ],
+        "t": 0.2
+      },
+      "layers": {
+        "top": 2,
+        "flap": true
+      },
+      "description": "Same on the right: fold the tip out to make the second horn."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "onto": [
+          "tr",
+          {
+            "mid": [
+              "center",
+              "bl"
+            ]
+          }
+        ]
+      },
+      "layers": {
+        "top": 1
+      },
+      "description": "Fold the bottom point of the front layer up to the middle."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "horizontal": {
+          "mid": [
+            "center",
+            "bl"
+          ]
+        }
+      },
+      "move": {
+        "lerp": [
+          {
+            "mid": [
+              "center",
+              "bl"
+            ]
+          },
+          "bl"
+        ],
+        "t": 0.25
+      },
+      "layers": {
+        "top": 2
+      },
+      "description": "Fold that band up again along the horns' base line."
+    },
+    {
+      "op": "valley",
+      "line": {
+        "horizontal": {
+          "mid": [
+            "center",
+            "bl"
+          ]
+        }
+      },
+      "move": "bl",
+      "tuck": "inside",
+      "description": "Tuck the back bottom flap up inside the helmet (between the back layer and the front layers). Open the bottom: done!"
+    }
+  ],
+  "alternatives": [
+    "hat_behind.json"
+  ]
+}
