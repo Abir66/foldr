@@ -1,17 +1,19 @@
 # Foldr
 
-Foldr is an origami simulator and an AI agent that folds paper. Watch curated folds in 3D, fold a sheet yourself step by step, or replay and run an AI agent that plans and performs the folds.
+Foldr is an origami simulator and an AI agent that folds paper. Watch folds in 3D, fold a sheet yourself step by step, or replay and run an AI agent that plans and performs the folds.
 
-Live demo: _link coming soon_ (placeholder: `https://YOURNAME.github.io/foldr/`)
+Live demo: https://abir66.github.io/foldr/ (AI is off in the demo; recorded AI runs still play)
 
 ## Features
 
-- Watch examples (crane, cup and more) as a 3D animation with step-by-step pictures.
-- Fold yourself: pick from the folds the simulator offers, or draw your own, and see layers stack up. Physics is checked after every step.
+- One editor for everything: examples (crane, cup, samurai helmet and more), your own files, your own folds and AI runs all open in the same canvas with play, step and scrub controls.
+- Views: 3D, flat top-down, front and back side by side, and the crease pattern. Pan and zoom in every view.
+- Fold yourself: pick a suggested fold, or tap points on the paper (named points, anywhere on an edge, or anywhere on the sheet). Drag a point to fold it onto another and watch the fold line follow. Physics is checked after every step.
+- "Fold yourself from step k": continue any example or AI run from any step.
 - Open your own fold-step JSON files.
-- Replay recorded AI runs, or run the agent live (needs the optional backend).
-- Export `.fold`, step JSON, timeline JSON, step pictures and crease pattern.
-- The simulator runs in your browser (Python via Pyodide); no server is needed except for the AI.
+- Replay recorded AI runs and see what went into and came out of the model each turn, or run the agent live (needs the optional backend).
+- Export from any source: step pictures (front and back), front and back of the current step, crease pattern, `.fold`, step JSON and timeline JSON.
+- The simulator runs in your browser (Python via Pyodide). No server is needed unless you want live AI runs.
 
 ## Quick start
 
@@ -49,7 +51,7 @@ Edit `backend/foldr.toml` (start from `backend/config.example.toml`):
 
 ## Deploy
 
-- Frontend: GitHub Pages through `.github/workflows/pages.yml`. In the repo go to Settings, Pages, Source, and pick "GitHub Actions". Push to main to publish.
+- Frontend: GitHub Pages through `.github/workflows/pages.yml`. In the repo go to Settings, Pages, Source, and pick "GitHub Actions". Push to main to publish. This is all you need for everything except live AI runs.
 - Backend (optional): Render, using `render.yaml` (Docker). AI stays off until you set `FOLDR_AI_ENABLED=1`, a provider key and `FOLDR_CORS_ORIGINS` in the dashboard. Then build the frontend with `VITE_API_URL` pointing at it.
 
 ## Repo layout
