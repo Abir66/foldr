@@ -1,0 +1,243 @@
+.fold-start {
+  min-height: 48px;
+  width: 100%;
+  margin: 4px 0 12px;
+  font-size: var(--t-m);
+}
+
+.loadbar {
+  margin: 8px 0;
+}
+.loadbar-label {
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+.loadbar-detail {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+.loadbar-track {
+  height: 8px;
+  background: var(--sheet-edge);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.loadbar-fill {
+  height: 100%;
+  background: var(--kami);
+  transition: width 0.2s linear;
+}
+
+.fold-msg {
+  margin: 8px 0;
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
+}
+.fold-msg.is-error {
+  color: var(--warn);
+}
+
+.fold-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+.fold-toolbar .button {
+  min-height: 44px;
+}
+.fold-export {
+  position: relative;
+}
+.fold-export .export-menu {
+  left: 0;
+  right: auto;
+  z-index: 5;
+}
+
+.actionbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--sheet);
+  border: 2px solid var(--sticker);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin: 6px 0 12px;
+}
+.actionbar-title {
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+.actionbar-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.actionbar-buttons .button {
+  min-height: 44px;
+  min-width: 88px;
+}
+.draw-opts {
+  display: grid;
+  gap: 6px;
+}
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.seg-opt {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--sheet-edge);
+  background: transparent;
+  color: var(--ink);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--t-xs);
+  cursor: pointer;
+}
+.seg-opt[aria-checked="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--sheet);
+}
+
+.mysteps .fold-steps {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0 0 12px;
+}
+.step-row.is-static {
+  cursor: default;
+}
+
+.suggest-sec {
+  margin: 0 0 14px;
+}
+.suggest-title {
+  margin: 0 0 6px;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 64px;
+  padding: 4px 8px 4px 4px;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--t-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.suggest-row:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+.suggest-row[aria-pressed="true"] {
+  border-color: var(--sticker);
+  background: rgba(242, 194, 48, 0.12);
+}
+.suggest-row:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.suggest-text {
+  flex: 1;
+}
+.suggest-more {
+  margin-top: 4px;
+  min-height: 36px;
+}
+
+.state-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  background: rgba(0, 0, 0, 0.03);
+}
+.state-thumb .face {
+  fill: var(--sheet);
+  stroke: var(--ink);
+  stroke-linejoin: round;
+}
+.state-thumb .face-kami {
+  fill: var(--kami);
+}
+
+.fold-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation;
+  z-index: 2;
+}
+.fold-overlay .pt-sticker circle {
+  fill: var(--sticker);
+  stroke: var(--ink);
+  stroke-width: 1.2;
+  cursor: pointer;
+}
+.fold-overlay .pt-sticker text {
+  font: 700 12px var(--font-ui);
+  fill: var(--ink);
+  text-anchor: middle;
+  pointer-events: none;
+}
+.fold-overlay .pt-sticker.is-chosen circle {
+  fill: var(--ink);
+  stroke: var(--sticker);
+  stroke-width: 2.5;
+}
+.fold-overlay .pt-sticker.is-chosen text {
+  fill: var(--sticker);
+}
+.fold-overlay .ghost {
+  fill: var(--sheet);
+  fill-opacity: 0.55;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+.fold-overlay .ghost-kami {
+  fill: var(--kami);
+}
+.fold-overlay .fold-line {
+  stroke: var(--sticker);
+  stroke-width: 3;
+  stroke-dasharray: 10 6;
+  pointer-events: none;
+}
+.fold-overlay .fold-line.is-mountain {
+  stroke-dasharray: 12 4 2 4;
+}
+.fold-overlay .move-dot {
+  fill: var(--warn);
+  pointer-events: none;
+}
+.fold-overlay .pt-sticker.is-small text {
+  font-size: 10px;
+}
+@media (max-width: 959px) {
+  .fold-toolbar .button {
+    padding: 0 10px;
+    font-size: var(--t-xs);
+  }
+}

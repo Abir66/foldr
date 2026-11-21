@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__ — origami viewer</title>
+<style>
+  :root { --ink:#2b2118; --panel:rgba(255,255,255,0.92); --accent:#1f5fbf; }
+  html, body { margin:0; height:100%; background:#e9edf2; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); overflow:hidden; }
+  #canvas { position:fixed; inset:0; }
+  #panel { position:fixed; left:16px; top:16px; max-width:min(440px, calc(100vw - 32px)); background:var(--panel);
+           border-radius:10px; padding:14px 16px; box-shadow:0 2px 12px rgba(0,0,0,0.12); }
+  #panel h1 { font-size:17px; margin:0 0 6px; }
+  #counter { font-size:13px; color:#6b5d50; margin-bottom:8px; }
+  #desc { font-size:15px; line-height:1.4; min-height:2.8em; }
+  #desc .op { display:inline-block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;
+              padding:1px 6px; border-radius:4px; color:#fff; background:#777; margin-right:6px; vertical-align:1px; }
+  #controls { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  button { font:inherit; font-size:14px; padding:7px 14px; border-radius:7px; border:1px solid #c9c2b8; background:#fff; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:0.45; cursor:default; }
+  #scrubrow { margin-top:12px; }
+  #scrub { width:100%; margin:4px 0 0; accent-color:var(--accent); }
+  #hint { position:fixed; right:16px; bottom:12px; font-size:12px; color:#6b5d50; background:var(--panel); padding:6px 10px; border-radius:6px; }
+  #err { position:fixed; inset:auto 16px 16px 16px; color:#a00; font-size:13px; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="canvas"></div>
+<div id="panel">
+  <h1 id="title"></h1>
+  <div id="counter"></div>
+  <div id="desc"></div>
+  <div id="controls">
+    <button id="prev">&larr; Previous</button>
+    <button id="next" class="primary">Next &rarr;</button>
+    <button id="reset">Reset view</button>
+  </div>
+  <div id="scrubrow">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b5d50"><span id="scrubl"></span><span id="scrubv"></span></div>
+    <input id="scrub" type="range" min="0" max="1000" step="1" value="0" aria-label="Fold progress of this step">
+  </div>
+  <div id="gaprow" style="margin-top:10px;font-size:12px;color:#6b5d50;display:flex;align-items:center;gap:8px">
+    <label for="gap">Layer gap</label>
+    <input id="gap" type="range" min="0.0005" max="0.02" step="0.0001" value="0.004" style="flex:1">
+    <span id="gapv">0.0040</span>
+  </div>
+</div>
+<div id="hint">Drag to orbit &middot; scroll to zoom &middot; right-drag to pan &middot; &larr; / &rarr; keys</div>
+<div id="err"></div>
+<script id="timeline" type="application/json">__TIMELINE__</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+
+const TL = JSON.parse(document.getElementById("timeline").textContent);
+const N = TL.steps.length;
+const SIZE = TL.size || 1;
+let DZ = 0.004 * SIZE;             // height between layers (avoids z-fighting); live-tunable via the slider
+const PRE = 280;                  // ms showing the fold line before moving
+const COLORS = {
+  front: 0xe07a3f, back: 0xfbf6ec, edge: 0x3a2a1a, crease: 0x5c3d24,
+  valley: 0x1f5fbf, mountain: 0xc0392b, unfold: 0x6b6b6b, flip: 0x444444,
+};
+const OP_BADGE = { valley:"#1f5fbf", mountain:"#c0392b", flip:"#444", rotate:"#444", unfold:"#6b6b6b",
+  squash:"#7a4fb0", petal:"#7a4fb0", inside_reverse:"#7a4fb0" };
+if (TL.colored_side === "down") [COLORS.front, COLORS.back] = [COLORS.back, COLORS.front];
+const nPhases = step => step.motions ? Math.max(1, step.phases || 1) : 1;   // multi-part steps play longer
+
+// ---------- three.js setup ----------
+const host = document.getElementById("canvas");
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0xe9edf2);
+host.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 100);
+camera.up.set(0, 1, 0);
+scene.add(camera);
+scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+const headlight = new THREE.DirectionalLight(0xffffff, 1.5);
+headlight.position.set(0.3, 0.5, 1);
+camera.add(headlight);
+const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+fill.position.set(0, 0, 1);
+scene.add(fill);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.12;
+
+// World frame: a flip never moves the paper, it moves the camera. Every state carries a map
+// engine coords -> world coords (see steps_export._world_for); a proper rotation, so no jump.
+function wpt(W, x, y, z) {
+  const M = W.M;
+  return [M[0][0] * x + M[0][1] * y + M[0][2], M[1][0] * x + M[1][1] * y + M[1][2], W.s * z + W.zoff * DZ];
+}
+// Frame all states (in world coords).
+let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
+for (const s of TL.states) {
+  for (const cx of [s.bbox[0][0], s.bbox[1][0]]) for (const cy of [s.bbox[0][1], s.bbox[1][1]]) {
+    const q = wpt(s.world, cx, cy, 0);
+    lo = [Math.min(lo[0], q[0]), Math.min(lo[1], q[1])];
+    hi = [Math.max(hi[0], q[0]), Math.max(hi[1], q[1])];
+  }
+}
+const center = new THREE.Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, 0);
+const span = Math.max(hi[0] - lo[0], hi[1] - lo[1], SIZE);
+// Camera on the working side of the paper (the side state k's top layer faces).
+function resetView(k = cur) {
+  const sd = TL.states[k].world.s;
+  controls.target.copy(center);
+  camera.position.set(center.x - sd * 0.35 * span, center.y - 0.8 * span, center.z + sd * 1.8 * span);
+  camera.lookAt(center);
+  controls.update();
+}
+let cur = 0, busy = false;
+resetView(0);
+
+const frontMat = new THREE.MeshLambertMaterial({ color: COLORS.front, side: THREE.FrontSide,
+  polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const backMat = new THREE.MeshLambertMaterial({ color: COLORS.back, side: THREE.BackSide,
+  polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const edgeMat = new THREE.LineBasicMaterial({ color: COLORS.edge });
+const creaseMat = new THREE.LineBasicMaterial({ color: COLORS.crease });   // opaque: no transparent sorting on paper
+
+const paper = new THREE.Group();
+scene.add(paper);
+const hints = new THREE.Group();
+scene.add(hints);
+const lineMats = [];
+
+// ---------- geometry helpers ----------
+const ap = (T, p) => [T[0][0] * p[0] + T[0][1] * p[1] + T[0][2], T[1][0] * p[0] + T[1][1] * p[1] + T[1][2]];
+
+function clearGroup(g) {
+  for (const c of [...g.children]) {
+    g.remove(c);
+    c.geometry && c.geometry.dispose();
+  }
+}
+
+// One flat convex piece: front mesh + back mesh + outline + creases, sharing a position buffer.
+function makePiece(orig, lines) {
+  const n = orig.length;
+  const pos = new THREE.BufferAttribute(new Float32Array(n * 3), 3);
+  const nrm = new THREE.BufferAttribute(new Float32Array(n * 3), 3);
+  const idx = [];
+  for (let i = 1; i < n - 1; i++) idx.push(0, i, i + 1);   // orig polygons are CCW -> front normal
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", pos);
+  geom.setAttribute("normal", nrm);
+  geom.setIndex(idx);
+  const front = new THREE.Mesh(geom, frontMat);
+  const back = new THREE.Mesh(geom, backMat);
+  const outline = new THREE.LineLoop(new THREE.BufferGeometry().setAttribute("position", pos), edgeMat);
+  const cpos = new THREE.BufferAttribute(new Float32Array(Math.max(lines.length, 1) * 6), 3);
+  const creases = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position", cpos), creaseMat);
+  creases.geometry.setDrawRange(0, lines.length * 2);
+  for (const o of [front, back, outline, creases]) { o.frustumCulled = false; paper.add(o); }
+  return {
+    // map(p) : orig 2D point -> [x, y, z]
+    update(map) {
+      for (let i = 0; i < n; i++) pos.setXYZ(i, ...map(orig[i]));
+      lines.forEach((l, j) => { cpos.setXYZ(2 * j, ...map(l[0])); cpos.setXYZ(2 * j + 1, ...map(l[1])); });
+      // Newell normal (robust for near-collinear vertices)
+      let nx = 0, ny = 0, nz = 0;
+      for (let i = 0; i < n; i++) {
+        const a = [pos.getX(i), pos.getY(i), pos.getZ(i)], b = [pos.getX((i + 1) % n), pos.getY((i + 1) % n), pos.getZ((i + 1) % n)];
+        nx += (a[1] - b[1]) * (a[2] + b[2]); ny += (a[2] - b[2]) * (a[0] + b[0]); nz += (a[0] - b[0]) * (a[1] + b[1]);
+      }
+      const L = Math.hypot(nx, ny, nz) || 1;
+      for (let i = 0; i < n; i++) nrm.setXYZ(i, nx / L, ny / L, nz / L);
+      pos.needsUpdate = true; nrm.needsUpdate = true; cpos.needsUpdate = true;
+    },
+  };
+}
+
+// Folded connection: the sheet wraps around a crease between two stacked layers -> half-cylinder strip.
+// The outside shows the colour of the upper face's top side; raw (cut) edges are never bent.
+function addBend(st, W, b) {
+  const fa = st.faces[b.a], fb = st.faces[b.b];
+  const wp = (f, p) => { const q = ap(f.T, p); return wpt(W, q[0], q[1], f.layer * DZ); };
+  const A = wp(fa, b.seg[0]), B = wp(fa, b.seg[1]), A2 = wp(fb, b.seg[0]), B2 = wp(fb, b.seg[1]);
+  const lowF = A[2] <= A2[2] ? fa : fb, upF = lowF === fa ? fb : fa;
+  const lowA = lowF === fa ? A : A2, lowB = lowF === fa ? B : B2, upA = lowF === fa ? A2 : A;
+  const r = Math.abs(upA[2] - lowA[2]) / 2, zc = (upA[2] + lowA[2]) / 2;
+  if (r < 1e-9) return;
+  const l = [B[0] - A[0], B[1] - A[1]], ll = Math.hypot(l[0], l[1]) || 1; l[0] /= ll; l[1] /= ll;
+  const mid = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+  const c = [0, 0]; for (const p of lowF.orig) { const q = wp(lowF, p); c[0] += q[0] / lowF.orig.length; c[1] += q[1] / lowF.orig.length; }
+  let n = [c[0] - mid[0], c[1] - mid[1]]; const dl = n[0] * l[0] + n[1] * l[1]; n = [n[0] - dl * l[0], n[1] - dl * l[1]];
+  const nl = Math.hypot(n[0], n[1]) || 1; const u = [-n[0] / nl, -n[1] / nl];   // outward (away from the faces)
+  // does the upper face show its front side upward?
+  let nz = 0; const w = upF.orig.map(p => wp(upF, p));
+  for (let i = 0; i < w.length; i++) { const a = w[i], d = w[(i + 1) % w.length]; nz += (a[0] - d[0]) * (a[1] + d[1]); }
+  const frontOut = nz > 0;
+  const K = 10, pos = [], idx = [];
+  for (let i = 0; i <= K; i++) {
+    const th = Math.PI * i / K, du = r * Math.sin(th) * 1.0, z = zc - r * Math.cos(th);
+    pos.push(A[0] + u[0] * du, A[1] + u[1] * du, z, B[0] + u[0] * du, B[1] + u[1] * du, z);
+  }
+  // winding so the triangle front faces outward at the bulge (th = 90deg): outward = u in xy
+  const t = [0, 0, 1], e = [l[0], l[1], 0], nrm = [t[1] * e[2] - t[2] * e[1], t[2] * e[0] - t[0] * e[2], 0];
+  const flipW = (nrm[0] * u[0] + nrm[1] * u[1] > 0) !== frontOut;
+  for (let i = 0; i < K; i++) {
+    const a0 = 2 * i, b0 = 2 * i + 1, a1 = 2 * i + 2, b1 = 2 * i + 3;
+    if (flipW) idx.push(a0, b0, a1, b0, b1, a1); else idx.push(a0, a1, b0, b0, a1, b1);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geom.setIndex(idx); geom.computeVertexNormals();
+  for (const m of [frontMat, backMat]) { const mesh = new THREE.Mesh(geom, m); mesh.frustumCulled = false; paper.add(mesh); }
+}
+
+function showState(k, withBends = true) {
+  clearGroup(paper);
+  const st = TL.states[k], W = st.world;
+  for (const f of st.faces) {
+    const piece = makePiece(f.orig, f.lines);
+    const z = f.layer * DZ;
+    piece.update(p => { const q = ap(f.T, p); return wpt(W, q[0], q[1], z); });
+  }
+  if (withBends) for (const b of st.bends || []) addBend(st, W, b);
+}
+
+// ---------- hints: fold line + tutorial arrows ----------
+const HINT_RENDER = 20;
+const ARROW_W = 0.0135 * SIZE;      // constant thin ribbon width
+let hintOp = 1, hintFade = 1, hintSide = 1, hintPlaneZ = 0;
+function hintMat(color, opacity = 1) {
+  const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthTest: false, depthWrite: false });
+  m.userData.base = opacity;
+  return m;
+}
+function addMesh(geom, mat, parent = hints) {
+  const m = new THREE.Mesh(geom, mat); m.renderOrder = HINT_RENDER; m.frustumCulled = false; parent.add(m); return m;
+}
+// ----- flat diagram arrows: ribbon + flat triangular head lying in the paper plane (z constant) -----
+function addFlat(tris, color, opacity = 1) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(tris.flat(2), 3));
+  const m = hintMat(color, opacity); m.side = THREE.DoubleSide;
+  return addMesh(g, m);
+}
+function resample(pts, step) {          // polyline -> points every `step` of arc length (xy, z kept)
+  const out = [pts[0]]; let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1], q = pts[i], L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    let t = step - acc;
+    while (t <= L) { const f = t / L; out.push([p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f]); t += step; }
+    acc = (acc + L) % step;
+  }
+  const last = pts[pts.length - 1], o = out[out.length - 1];
+  if (Math.hypot(last[0] - o[0], last[1] - o[1]) > step * 0.3) out.push(last);
+  return out;
+}
+function pathLen(pts) { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L; }
+function subPath(pts, s0, s1) {          // part of a fine polyline between arc lengths s0..s1
+  const out = []; let acc = 0;
+  const at = (p, q, f) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f];
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1], q = pts[i], L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (acc + L >= s0 && acc <= s1 && L > 0) {
+      const f0 = Math.max(0, (s0 - acc) / L), f1 = Math.min(1, (s1 - acc) / L);
+      if (!out.length) out.push(at(p, q, f0));
+      out.push(at(p, q, f1));
+    }
+    acc += L;
+  }
+  return out;
+}
+function ribbonTris(pts, w) {
+  const tris = [], off = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[Math.max(0, i - 1)], q = pts[Math.min(pts.length - 1, i + 1)];
+    let dx = q[0] - p[0], dy = q[1] - p[1]; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    off.push([-dy * w / 2, dx * w / 2]);
+  }
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1], oa = off[i], ob = off[i + 1];
+    const A = [a[0] + oa[0], a[1] + oa[1], a[2]], B = [a[0] - oa[0], a[1] - oa[1], a[2]];
+    const C = [b[0] + ob[0], b[1] + ob[1], b[2]], D = [b[0] - ob[0], b[1] - ob[1], b[2]];
+    tris.push(A, B, C, B, D, C);
+  }
+  return tris;
+}
+function headTris(tip, dir, hl, hw, hollow) {
+  const d = Math.hypot(dir[0], dir[1]) || 1, ux = dir[0] / d, uy = dir[1] / d, z = tip[2];
+  const P = [[tip[0], tip[1], z],
+             [tip[0] - ux * hl - uy * hw, tip[1] - uy * hl + ux * hw, z],
+             [tip[0] - ux * hl + uy * hw, tip[1] - uy * hl - ux * hw, z]];
+  if (!hollow) return P;
+  const cx = (P[0][0] + P[1][0] + P[2][0]) / 3, cy = (P[0][1] + P[1][1] + P[2][1]) / 3, k = 0.45;
+  const I = P.map(p => [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k, z]);
+  const tris = [];
+  for (let i = 0; i < 3; i++) { const j = (i + 1) % 3; tris.push(P[i], P[j], I[i], P[j], I[j], I[i]); }
+  return tris;
+}
+// pts: world polyline at constant z. Solid ribbon (valley / plain) or dashed ribbon + outlined head (mountain).
+function addArrow(pts, color, { width, dashed = false, hollow = false, both = false, opacity = 1 } = {}) {
+  const fine = resample(pts, width * 0.25), L = pathLen(fine);
+  const hl = Math.min(0.05 * SIZE, L * 0.4), hw = hl * 0.5;   // constant head, independent of arrow length
+  const s0 = both ? hl * 0.9 : 0, s1 = L - hl * 0.9;
+  const tris = [];
+  if (!dashed) tris.push(...ribbonTris(subPath(fine, s0, s1), width));
+  else {
+    const dash = width * 2.2, gap = width * 1.3;
+    for (let s = s0; s < s1 - 1e-9; s += dash + gap) {
+      const seg = subPath(fine, s, Math.min(s + dash, s1));
+      if (seg.length > 1) tris.push(...ribbonTris(seg, width));
+    }
+  }
+  const dirAt = (i, j) => [fine[i][0] - fine[j][0], fine[i][1] - fine[j][1]];
+  const n = fine.length;
+  const heads = headTris(fine[n - 1], dirAt(n - 1, Math.max(0, n - 3)), hl, hw, hollow);
+  const heads2 = both ? headTris(fine[0], dirAt(0, Math.min(n - 1, 2)), hl, hw, hollow) : [];
+  addFlat([...tris, ...heads, ...heads2], color, opacity);
+}
+function addDot(p, color, r) {
+  const tris = [], K = 16;
+  for (let i = 0; i < K; i++) {
+    const a = 2 * Math.PI * i / K, b = 2 * Math.PI * (i + 1) / K;
+    tris.push([p[0], p[1], p[2]], [p[0] + r * Math.cos(a), p[1] + r * Math.sin(a), p[2]], [p[0] + r * Math.cos(b), p[1] + r * Math.sin(b), p[2]]);
+  }
+  addFlat(tris, color);
+}
+function addLabel(text, p, color = "#333", scale = 0.07) {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 80;
+  const x = c.getContext("2d");
+  x.fillStyle = "rgba(255,255,255,0.9)"; x.beginPath(); x.roundRect(4, 6, 248, 68, 18); x.fill();
+  x.fillStyle = color; x.font = "bold 36px system-ui, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillText(text, 128, 42);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+  mat.userData.base = 1;
+  const sp = new THREE.Sprite(mat); sp.scale.set(scale * span * 3.2, scale * span, 1);
+  sp.position.set(...p); sp.renderOrder = HINT_RENDER + 2; hints.add(sp);
+}
+function addFoldLine(a, b, color, dashSize, gapSize) {
+  const geom = new LineGeometry();
+  geom.setPositions([...a, ...b]);
+  const mat = new LineMaterial({ color, linewidth: 6, dashed: true, dashSize, gapSize, transparent: true, depthTest: false, depthWrite: false });
+  mat.resolution.set(window.innerWidth, window.innerHeight);
+  mat.userData.base = 1;
+  mat.userData.bothSides = true;   // fold line stays visible from either side of the paper
+  lineMats.push(mat);
+  const line = new Line2(geom, mat);
+  line.computeLineDistances(); line.renderOrder = HINT_RENDER; line.frustumCulled = false;
+  hints.add(line);
+}
+function clearHints() {
+  for (const c of [...hints.children]) {
+    hints.remove(c);
+    c.geometry && c.geometry.dispose();
+    if (c.material) { c.material.map && c.material.map.dispose(); c.material.dispose(); }
+  }
+  lineMats.length = 0;
+}
+function setHintOpacity(o) {
+  if (o !== undefined) hintOp = o;
+  hints.traverse(c => {
+    if (!c.material) return;
+    const f = hintOp * (c.material.userData.bothSides ? 1 : hintFade);
+    c.material.opacity = (c.material.userData.base ?? 1) * f; c.visible = f > 0.01;
+  });
+}
+// hints belong to the working side: fade them out when the camera looks at the paper from behind
+function updateHintFade() {
+  const dx = camera.position.x - controls.target.x, dy = camera.position.y - controls.target.y, dz = camera.position.z - hintPlaneZ;
+  const d = hintSide * dz / (Math.hypot(dx, dy, dz) || 1);
+  const f = Math.min(1, Math.max(0, (d - 0.03) / 0.15));
+  if (Math.abs(f - hintFade) > 1e-4) { hintFade = f; setHintOpacity(); }
+}
+function polyEnd(pts) {
+  const n = pts.length;
+  return [pts[n - 1], [pts[n - 1][0] - pts[n - 2][0], pts[n - 1][1] - pts[n - 2][1], pts[n - 1][2] - pts[n - 2][2]]];
+}
+
+// Hints for the *next* step k (shown while it is pending): fold line + arrow, turn-over or rotate indicator.
+function setHints(k, opacity = 1) {
+  clearHints();
+  const step = TL.steps[k];
+  if (!step) return;
+  const st = TL.states[k], W = st.world;
+  hintSide = W.s; hintPlaneZ = W.zoff * DZ;
+  const color = COLORS[step.op] ?? COLORS.unfold;
+  const zTop = (Math.max(0, ...st.faces.map(f => f.layer)) + 2) * DZ;
+  const E = (x, y, z) => wpt(W, x, y, z);       // engine -> world
+  if (step.motions) {
+    // multi-part technique step: fold lines of the first phase only, no arrows
+    for (const ax of step.axes || []) {
+      if (ax.phase !== 0) continue;
+      const [a, b] = ax.seg, mountain = ax.sign < 0;
+      const dashed = mountain ? [0.05 * SIZE, 0.03 * SIZE] : [0.06 * SIZE, 0.035 * SIZE];
+      addFoldLine(E(a[0], a[1], zTop), E(b[0], b[1], zTop), mountain ? COLORS.mountain : COLORS.valley, ...dashed);
+    }
+  } else if (step.axis && step.op !== "flip") {
+    const [a, b] = step.axis;
+    const dashed = step.op === "mountain" ? [0.05 * SIZE, 0.03 * SIZE] : [0.06 * SIZE, 0.035 * SIZE];
+    addFoldLine(E(a[0], a[1], zTop), E(b[0], b[1], zTop), color, ...dashed);
+  }
+  const lo_ = st.bbox[0], hi_ = st.bbox[1], cx = (lo_[0] + hi_[0]) / 2, cy = (lo_[1] + hi_[1]) / 2;
+  const sp = Math.max(hi_[0] - lo_[0], hi_[1] - lo_[1]);
+  if ((step.op === "valley" || step.op === "mountain") && step.arrow && step.axis) {
+    const [ax, ay] = step.axis[0], [bx, by] = step.axis[1];
+    let ux = bx - ax, uy = by - ay; const ul = Math.hypot(ux, uy); ux /= ul; uy /= ul;
+    const [px, py] = step.arrow.from;
+    const along = (px - ax) * ux + (py - ay) * uy;
+    const c0 = [ax + along * ux, ay + along * uy];
+    const d = [px - c0[0], py - c0[1]], dl = Math.hypot(d[0], d[1]);
+    void c0; void d; void dl;
+    const valley = step.op === "valley", wd = ARROW_W;
+    // quadratic arc like the PNG diagrams (matplotlib arc3, rad = 0.35), lying flat on the paper
+    const [tx, ty] = step.arrow.to, mx = (px + tx) / 2, my = (py + ty) / 2, rad = 0.35;
+    const kx = mx + rad * (ty - py), ky = my - rad * (tx - px);
+    const pts = [], xy = [];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40, a0 = (1 - t) * (1 - t), a1 = 2 * t * (1 - t), a2 = t * t;
+      xy.push([a0 * px + a1 * kx + a2 * tx, a0 * py + a1 * ky + a2 * ty]);
+    }
+    // low arch: ends just above the paper, middle raised ~15% of arrow length (capped); ribbon stays flat (normal ~ up)
+    const aL = pathLen(xy), peak = Math.min(0.15 * aL, 0.06 * SIZE);
+    xy.forEach(([x, y], i) => pts.push(E(x, y, zTop + peak * Math.sin(Math.PI * i / 40))));
+    addArrow(pts, color, { width: wd, dashed: !valley, hollow: !valley });
+    addDot(E(px, py, zTop), color, wd * 0.9);
+  } else if (step.op === "flip") {
+    // turn-over: double-headed arc under the paper (like the PNG diagrams), on the camera's side
+    const sd = W.s, c = E(cx, cy, 0), y0 = c[1] - 0.58 * sp, half = 0.4 * sp, hgt = 0.2 * sp;
+    const pts = [], z = c[2] + sd * zTop;
+    for (let i = 0; i <= 30; i++) { const th = Math.PI * i / 30; pts.push([c[0] - half * Math.cos(th), y0 - hgt * Math.sin(th), z]); }
+    addArrow(pts, 0x333333, { width: ARROW_W, both: true });
+    addLabel("turn over", [c[0], y0 - hgt - 0.1 * sp, z], "#333");
+  } else if (step.op === "rotate") {
+    const r = 0.62 * sp, deg = step.degrees, a0 = 60;
+    const pts = [], n = 32;
+    for (let i = 0; i <= n; i++) {
+      const a = (a0 + deg * i / n) * Math.PI / 180;
+      pts.push(E(cx + r * Math.cos(a), cy + r * Math.sin(a), zTop));
+    }
+    addArrow(pts, 0x333333, { width: ARROW_W });
+    const am = (a0 + deg / 2) * Math.PI / 180;
+    addLabel(`rotate ${deg}°`, E(cx + (r + 0.12 * sp) * Math.cos(am), cy + (r + 0.12 * sp) * Math.sin(am), zTop), "#333");
+  }
+  hintOp = opacity; setHintOpacity();
+}
+
+// ---------- connected (kinematic) animation, see kinematics.py ----------
+// Every piece hangs off its parent by a hinge along their shared edge; its frame is the parent's frame
+// turned about that edge by the current fold angle, so the paper never comes apart at a tree hinge.
+// Frames map orig (x, y, 0) -> engine 3D; z offsets are in layer units * DZ.
+const _ax = new THREE.Vector3(), _m = new THREE.Matrix4(), _p = new THREE.Vector3();
+function frameE3(T) {
+  const det = T[0][0] * T[1][1] - T[0][1] * T[1][0] > 0 ? 1 : -1;
+  return new THREE.Matrix4().set(T[0][0], T[0][1], 0, T[0][2], T[1][0], T[1][1], 0, T[1][2], 0, 0, det, 0, 0, 0, 0, 1);
+}
+function hingeMat(p, d, th, out = new THREE.Matrix4()) {   // rotation by th about the line (p, d) in z = 0
+  _ax.set(d[0], d[1], 0).normalize();
+  out.makeRotationAxis(_ax, th);
+  _p.set(p[0], p[1], 0).applyMatrix4(out);
+  out.elements[12] = p[0] - _p.x; out.elements[13] = p[1] - _p.y; out.elements[14] = -_p.z;
+  return out;
+}
+const zMat = z => new THREE.Matrix4().makeTranslation(0, 0, z);
+const winEase = (t, w) => w[1] - w[0] < 1e-12 ? (t >= w[1] ? 1 : 0) : ease(Math.min(1, Math.max(0, (t - w[0]) / (w[1] - w[0]))));
+// table lookup: tab sampled uniformly on [0, 1]
+function lerpTab(tab, x) {
+  const S = tab.length - 1, v = Math.min(S, Math.max(0, x * S)), i = Math.min(S - 1, Math.floor(v));
+  return tab[i] + (tab[i + 1] - tab[i]) * (v - i);
+}
+// path parameter u at linear progress t: eased, then (solved steps) retimed so the paper moves at an even pace
+const pathU = (step, t) => step.retime ? lerpTab(step.retime, ease(t)) : ease(t);
+function hingeAngle(pc, t, u) {
+  if (pc.keys) return lerpTab(pc.keys, u);          // solved angles (loops kept closed), sampled uniformly in u
+  const w = pc.win, f = w[0] <= 0 && w[1] >= 1 ? u : winEase(t, w);
+  return pc.theta[0] + (pc.theta[1] - pc.theta[0]) * f;
+}
+// frames of all pieces at linear progress t
+// scripted frames (inside reverse "fake spread"): key = [R 3x3 row-major, t, w], frame = [R | t + DZ w]
+function keyFrame(fk, u) {
+  const S = fk.length - 1, x = Math.min(S, Math.max(0, u * S)), i = Math.min(S - 1, Math.floor(x)), f = x - i;
+  const a = fk[i], b = fk[i + 1], k = a.map((v, j) => v + (b[j] - v) * f);
+  return new THREE.Matrix4().set(k[0], k[1], k[2], k[9] + DZ * k[12], k[3], k[4], k[5], k[10] + DZ * k[13],
+                                 k[6], k[7], k[8], k[11] + DZ * k[14], 0, 0, 0, 1);
+}
+function kinFrames(step, t) {
+  const G = new Array(step.pieces.length), e = pathU(step, t);
+  if (step.pieces.length && step.pieces[0].fkeys) return step.pieces.map(pc => keyFrame(pc.fkeys, e));
+  for (const i of step.kin_order) {
+    const pc = step.pieces[i];
+    if (pc.parent < 0) {
+      const M = frameE3(pc.Tb), m = pc.root_motion;
+      if (m && m.type === "hinge") M.premultiply(hingeMat(m.p, m.d, m.angle * e));
+      else if (m && m.type === "rotate") {
+        const a = m.degrees * Math.PI / 180 * e, [cx, cy] = m.center;
+        M.premultiply(new THREE.Matrix4().makeTranslation(cx, cy, 0).multiply(new THREE.Matrix4().makeRotationZ(a)).multiply(new THREE.Matrix4().makeTranslation(-cx, -cy, 0)));
+      } else if (m && m.type === "translate") M.premultiply(new THREE.Matrix4().makeTranslation(m.t[0] * e, m.t[1] * e, 0));
+      G[i] = M.multiply(zMat((pc.h[0] + (pc.h[1] - pc.h[0]) * e) * DZ));
+    } else {
+      const th = hingeAngle(pc, t, e);
+      // layer offset follows the hinge's own progress (or the whole step if the angle doesn't change)
+      const span = pc.theta[1] - pc.theta[0];
+      const f = Math.abs(span) > 1e-9 && !pc.keys ? Math.min(1, Math.max(0, (th - pc.theta[0]) / span)) : e;
+      const dl = pc.delta[0] + (pc.delta[1] - pc.delta[0]) * f;
+      G[i] = G[pc.parent].clone().multiply(hingeMat(pc.hinge[0], pc.hinge[1], th, _m)).multiply(zMat(dl * DZ));
+    }
+  }
+  return G;
+}
+// bend strip that follows its hinge while the two pieces lie folded flat on each other
+const BK = 10;
+function makeKinBend(b) {
+  const pos = new THREE.BufferAttribute(new Float32Array((BK + 1) * 6), 3);
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", pos);
+  const [p, q] = b.seg, n = b.n;
+  const cr = (q[0] - p[0]) * n[1] - (q[1] - p[1]) * n[0];   // winding: front of paper = +z of the frame piece
+  const idx = [];
+  for (let i = 0; i < BK; i++) {
+    const a0 = 2 * i, b0 = 2 * i + 1, a1 = 2 * i + 2, b1 = 2 * i + 3;
+    if (cr > 0) idx.push(a0, b0, a1, b0, b1, a1); else idx.push(a0, a1, b0, b0, a1, b1);
+  }
+  geom.setIndex(idx);
+  const meshes = [frontMat, backMat].map(m => { const o = new THREE.Mesh(geom, m); o.frustumCulled = false; paper.add(o); return o; });
+  const v = new THREE.Vector3();
+  return {
+    update(G, step, W, t) {
+      const Gf = G[b.f], Go = G[b.o];
+      // visible only while o lies folded flat onto f (normals opposite)
+      const ef = Gf.elements, eo = Go.elements;
+      const nf = [ef[8], ef[9], ef[10]], no = [eo[8], eo[9], eo[10]];
+      const dot = nf[0] * no[0] + nf[1] * no[1] + nf[2] * no[2];
+      // o's surface height in f's frame
+      v.set(p[0], p[1], 0).applyMatrix4(Go).applyMatrix4(_m.copy(Gf).invert());
+      const z1 = v.z, r = Math.abs(z1) / 2;
+      const show = dot < -0.995 && r > 1e-9;
+      for (const o of meshes) o.visible = show;
+      if (!show) return;
+      const sg = Math.sign(z1), zc = z1 / 2;
+      for (let i = 0; i <= BK; i++) {
+        const ph = Math.PI * i / BK, du = r * Math.sin(ph), z = zc - sg * r * Math.cos(ph);
+        for (const [k, s] of [[0, p], [1, q]]) {
+          v.set(s[0] + n[0] * du, s[1] + n[1] * du, z).applyMatrix4(Gf);
+          pos.setXYZ(2 * i + k, ...wpt(W, v.x, v.y, v.z));
+        }
+      }
+      pos.needsUpdate = true;
+      geom.computeVertexNormals();
+    },
+  };
+}
+
+let animPieces = null, animBends = [];
+function buildStepPieces(step) {
+  clearGroup(paper);
+  animPieces = step.pieces.map(pc => ({ pc, obj: makePiece(pc.orig, pc.lines || []) }));
+  animBends = (step.kin_bends || []).map(makeKinBend);
+}
+// t: linear progress 0..1 over the whole step (eased inside)
+function poseStep(step, t) {
+  const W = TL.states[step.index - 1].world;
+  const G = kinFrames(step, t), v = new THREE.Vector3();
+  animPieces.forEach(({ obj }, i) => obj.update(p => { v.set(p[0], p[1], 0).applyMatrix4(G[i]); return wpt(W, v.x, v.y, v.z); }));
+  for (const b of animBends) b.update(G, step, W, t);
+}
+// ----- flip = camera move: the paper stays put, the camera swings 180 deg around the vertical axis -----
+function flipNeeded(side) { return (camera.position.z - controls.target.z) * side < 0; }
+function flipCamera(base, e) {              // base: camera offset from target at t = 0; e in [0,1]
+  const ph = Math.PI * e, c = Math.cos(ph), s = Math.sin(ph);
+  camera.position.set(controls.target.x + base.x * c + base.z * s, controls.target.y + base.y, controls.target.z - base.x * s + base.z * c);
+  camera.lookAt(controls.target);
+  controls.update();
+}
+
+// ---------- UI / state machine ----------
+// cur = number of finished steps. The scrub slider shows ONE step's progress: step sk at st in [0, 1].
+// Invariant: st < 1 -> cur = sk (step sk not finished; st > 0 = partly folded, held there);
+//            st = 1 -> cur = sk + 1 (step sk done; Next plays step sk + 1, dragging back undoes sk).
+// Next / Prev animate whole steps (from wherever the slider is) and move the slider along.
+const $ = id => document.getElementById(id);
+$("title").textContent = TL.title || TL.name;
+let sk = 0, st = 0, anim = null;
+let posed = null;                 // what is currently built for a partial pose: "kin:k" / "flip:k"
+let hintK = -1;                   // step whose hints are built
+let flipCtx = null;               // camera swing of the flip step being posed: {k, base, orbit}
+
+function updateUI() {
+  $("prev").disabled = busy || (cur === 0 && st === 0);
+  $("next").disabled = busy || cur === N;
+  $("counter").textContent = cur === N
+    ? `Finished — all ${N} steps done`
+    : `Step ${cur + 1} of ${N}` + (cur > 0 ? ` (${cur} done)` : "");
+  const s = TL.steps[cur];
+  $("desc").innerHTML = "";
+  if (s) {
+    const badge = document.createElement("span");
+    badge.className = "op"; badge.textContent = s.op; badge.style.background = OP_BADGE[s.op] || "#777";
+    $("desc").append(badge, document.createTextNode(s.description));
+  } else {
+    $("desc").textContent = "Done! Drag to look at the finished model from any side.";
+  }
+  if (N) {
+    $("scrub").value = Math.round(st * 1000);
+    $("scrubl").textContent = `Step ${sk + 1} (${TL.steps[sk].op})`;
+    $("scrubv").textContent = st >= 1 ? "done" : `${Math.round(st * 100)}%`;
+  }
+}
+
+function rest(k) {                // state k at rest: layers, bends, creases + hints for the next step
+  cur = k;
+  posed = null;
+  if (flipCtx) { flipCtx = null; controls.enabled = true; }
+  showState(k);
+  setHints(k); hintK = k;
+  updateUI();
+}
+
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const hintOpacity = (step, t) => Math.max(0, 1 - 3 * ease(Math.min(1, t * nPhases(step))));   // fades with the first phase
+
+// camera swing for flip step k; t0 = the progress the camera currently shows (0 or 1)
+function flipContext(k, t0) {
+  if (flipCtx && flipCtx.k === k) return flipCtx;
+  const s = TL.steps[k], o = camera.position.clone().sub(controls.target);
+  const orbit = flipNeeded(t0 >= 1 ? s.side_before : s.side_after);
+  const base = orbit && t0 >= 1 ? new THREE.Vector3(-o.x, o.y, -o.z) : o;    // turned back by 180 deg
+  controls.enabled = false;
+  return (flipCtx = { k, base, orbit });
+}
+
+// Show step k at progress t (pure function of k, t). t = 0 / 1 rest at state k / k + 1.
+function show(k, t) {
+  const step = TL.steps[k];
+  t = Math.min(1, Math.max(0, t));
+  const tFrom = cur > k ? 1 : 0;                       // what the screen showed for step k so far
+  if (step.op === "flip") {
+    const fc = flipContext(k, sk === k ? st : tFrom);
+    if (fc.orbit) flipCamera(fc.base, ease(t));
+  }
+  sk = k; st = t;
+  if (t >= 1) { rest(k + 1); return; }
+  if (t <= 0) { rest(k); return; }
+  cur = k;
+  if (step.op === "flip") {
+    if (posed !== "flip:" + k) { showState(k); posed = "flip:" + k; }
+  } else {
+    if (posed !== "kin:" + k) { buildStepPieces(step); posed = "kin:" + k; }
+    poseStep(step, t);
+  }
+  if (hintK !== k) { setHints(k); hintK = k; }
+  setHintOpacity(hintOpacity(step, t));
+  updateUI();
+}
+
+// fold time: grows with how far the paper travels; multi-crease (solved / macro) steps get longer
+function stepDuration(step) {
+  if (step.op === "flip") return flipNeeded(cur > step.index - 1 ? step.side_before : step.side_after) ? 1000 : 300;
+  const multi = !!(step.motions || step.retime);
+  const d = 850 * Math.sqrt(Math.max(0, step.path_len ?? SIZE) / SIZE) * (multi ? 1.6 : 1);
+  return Math.min(3000, Math.max(900, d));
+}
+
+// animate step k from its current progress to `target` (0 or 1)
+function animateTo(k, target) {
+  if (busy) return;
+  const step = TL.steps[k];
+  const from = sk === k ? st : (target > 0.5 ? 0 : 1);
+  if (sk !== k || st !== from) show(k, from);
+  const dur = stepDuration(step) * Math.abs(target - from);
+  const pre = target > from && from === 0 && step.op !== "flip" ? PRE : 0;   // show the fold line before moving
+  const me = anim = { k };
+  busy = true;
+  updateUI();
+  const t0 = performance.now();
+  function frame(now) {
+    if (anim !== me) return;                             // cancelled (slider grabbed)
+    const f = dur > 0 ? Math.min(1, Math.max(0, (now - t0 - pre) / dur)) : 1;
+    if (f <= 0 && from <= 0) { requestAnimationFrame(frame); return; }   // still showing the fold line
+    if (f >= 1) { anim = null; busy = false; show(k, target); return; }
+    show(k, from + (target - from) * f);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+function cancelAnim() { if (anim) { anim = null; busy = false; } }
+
+const next = () => { if (!busy && cur < N) animateTo(cur, 1); };
+const prev = () => {
+  if (busy) return;
+  if (sk === cur && st > 0 && st < 1) animateTo(cur, 0);          // undo the part-folded step
+  else if (cur > 0) animateTo(cur - 1, 0);
+};
+$("next").onclick = next;
+$("prev").onclick = prev;
+$("reset").onclick = () => resetView();
+$("scrub").addEventListener("input", () => {
+  cancelAnim();
+  show(sk, parseInt($("scrub").value, 10) / 1000);
+});
+$("gap").oninput = () => {
+  DZ = parseFloat($("gap").value) * SIZE;
+  $("gapv").textContent = parseFloat($("gap").value).toFixed(4);
+  if (busy) return;              // during a fold the next frame picks up DZ
+  hintK = -1;
+  if (st > 0 && st < 1) { posed = null; show(sk, st); } else rest(cur);
+};
+window.addEventListener("keydown", ev => {
+  if (ev.key === "ArrowRight") { next(); ev.preventDefault(); }          // also when the slider has focus
+  else if (ev.key === "ArrowLeft") { prev(); ev.preventDefault(); }
+});
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  for (const m of lineMats) m.resolution.set(window.innerWidth, window.innerHeight);
+});
+
+// depth precision: keep near / far tight around the paper (thin layer gaps must not z-fight)
+function fitClip() {
+  const dist = camera.position.distanceTo(controls.target);
+  const near = Math.max(dist * 0.02, dist - 2 * span), far = dist + 3 * span;
+  if (Math.abs(near - camera.near) > 1e-3 * near || Math.abs(far - camera.far) > 1e-3 * far) {
+    camera.near = near; camera.far = far; camera.updateProjectionMatrix();
+  }
+}
+function loop() { controls.update(); fitClip(); updateHintFade(); renderer.render(scene, camera); requestAnimationFrame(loop); }
+
+// Hooks for scripted checks / screenshots: ?step=k starts at state k; ?pose=k,t freezes step k at t.
+window.__viewer = {
+  next, prev, rest, show, get cur() { return cur; }, get busy() { return busy; },
+  get scrub() { return { k: sk, t: st }; },
+  showHints(v) { hints.visible = v; },
+  pose(k, t) { cancelAnim(); show(k, t); },
+  // engine-space position of every piece's first vertex at step k, progress t (for scripted checks)
+  kinPoints(k, t) {
+    const s = TL.steps[k], G = kinFrames(s, t);
+    return s.pieces.map((pc, i) => new THREE.Vector3(pc.orig[0][0], pc.orig[0][1], 0).applyMatrix4(G[i]).toArray());
+  },
+  camSide() { return Math.sign(camera.position.z - controls.target.z); },
+  orbit(theta, phi) {   // spherical view angles in degrees around the target
+    const r = camera.position.distanceTo(controls.target), th = theta * Math.PI / 180, ph = phi * Math.PI / 180;
+    camera.position.set(center.x + r * Math.sin(ph) * Math.sin(th), center.y - r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph));
+    controls.update();
+  },
+};
+const qs = new URLSearchParams(location.search);
+{
+  const k0 = Math.min(N, Math.max(0, parseInt(qs.get("step") || "0", 10) || 0));
+  resetView(k0);
+  if (k0 === N && N) { sk = N - 1; st = 1; } else { sk = k0; st = 0; }
+  rest(k0);
+  if (!N) $("scrubrow").style.display = "none";
+}
+if (qs.get("pose")) { const [k, t] = qs.get("pose").split(",").map(Number); window.__viewer.pose(k, t); }
+if (qs.get("orbit")) { const [a, b] = qs.get("orbit").split(",").map(Number); window.__viewer.orbit(a, b); }
+loop();
+window.__viewer.ready = true;
+</script>
+<script>
+  window.addEventListener("error", e => { document.getElementById("err").textContent = "Error: " + e.message; });
+</script>
+</body>
+</html>

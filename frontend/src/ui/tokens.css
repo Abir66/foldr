@@ -1,0 +1,93 @@
+/* Design tokens: palette, type, radius, shadows. */
+:root {
+  /* surfaces: a calm light studio; the paper is the only strong colour */
+  --bg: #eceff3; /* stage, like the original viewer */
+  --sheet: #ffffff; /* header, panels, transport */
+  --sheet-edge: #e2e6eb; /* hairlines, tracks */
+  --hover: #f2f4f7;
+  --ink: #1d2328;
+  --ink-soft: #545e68;
+  --kami: #2f5da8;
+  --kami-deep: #234a8a;
+  --accent: #ec7a2f; /* crease orange: fold lines, current step */
+  --accent-deep: #b9551a;
+  --accent-soft: #fdf0e6;
+  --sticker: #f2c230; /* Fold-mode point markers */
+  --warn: #c2412d;
+
+  --font-title: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", Georgia, serif;
+  --font-ui: "Zen Kaku Gothic New", "Hiragino Sans", "Segoe UI", system-ui, sans-serif;
+  --font-code: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  /* type scale */
+  --t-xs: 13px;
+  --t-s: 15px;
+  --t-m: 18px;
+  --t-l: 24px;
+  --t-xl: 34px;
+
+  --radius: 6px;
+  --radius-l: 12px;
+  --shadow-sheet: 0 1px 2px rgba(22, 32, 44, 0.08), 0 8px 24px -12px rgba(22, 32, 44, 0.22);
+  --shadow-pop: 0 0 0 1px var(--sheet-edge), 0 16px 32px -14px rgba(22, 32, 44, 0.3);
+  --header-h: 56px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-s);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--kami);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
